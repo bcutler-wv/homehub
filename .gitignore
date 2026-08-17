@@ -21,3 +21,6 @@ coverage/
 .claude/
 .DS_Store
 *.log
+
+# personal documents — never commit
+house-manager-*.pdf
