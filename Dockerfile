@@ -1,12 +1,12 @@
 FROM node:20-alpine AS backend-build
 WORKDIR /app/backend
-COPY backend/package.json .
-RUN npm install --production
+COPY backend/package.json backend/package-lock.json .
+RUN npm ci --omit=dev
 
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
-COPY frontend/package.json .
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json .
+RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
