@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { dateKey, useTodayKey } from "../lib/utils";
+import {
+  normalizeTasks, completionKey, dateWeekday, isTaskOnDay, taskAppearsOnDay,
+} from "../lib/taskSchedule";
 
 const WEEKDAY_OPTIONS = [
   { value: 1, label: "Mon" },
@@ -13,22 +16,6 @@ const WEEKDAY_OPTIONS = [
 ];
 
 const DAY_TONES = ["blush", "peach", "sage", "linen", "moss", "cloud", "rose"];
-
-const normalizeTasks = (tasks) => ({
-  items: Array.isArray(tasks?.items) ? tasks.items : [],
-  completions: tasks?.completions && typeof tasks.completions === "object" ? tasks.completions : {},
-});
-
-const completionKey = (taskId, dayKey) => `${taskId}:${dayKey}`;
-
-const dateWeekday = (dayKey) => new Date(`${dayKey}T12:00:00`).getDay();
-
-const isTaskOnDay = (task, dayKey) => {
-  if (task.active === false) return false;
-  if (task.type === "once") return task.date === dayKey;
-  if (task.type === "weekday") return (task.weekdays || []).includes(dateWeekday(dayKey));
-  return false;
-};
 
 const initialsFor = (name) => {
   if (!name) return "?";
@@ -146,7 +133,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
   };
 
   const tasksForDay = (dayKey) => data.items
-    .filter(task => isTaskOnDay(task, dayKey))
+    .filter(task => taskAppearsOnDay(task, dayKey, data.moves))
     .sort((a, b) => {
       const ac = !!data.completions[completionKey(a.id, dayKey)]?.completed;
       const bc = !!data.completions[completionKey(b.id, dayKey)]?.completed;
