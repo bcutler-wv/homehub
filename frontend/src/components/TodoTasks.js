@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { dateKey, useTodayKey } from "../lib/utils";
 import {
-  normalizeTasks, completionKey, dateWeekday, isTaskOnDay, taskAppearsOnDay,
+  normalizeTasks, completionKey, taskAppearsOnDay,
 } from "../lib/taskSchedule";
 
 const WEEKDAY_OPTIONS = [
@@ -151,6 +151,9 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
       date: dayKey,
       weekdays: [1, 2, 3, 4, 5],
       active: true,
+      sourceId: null,
+      fromRecurringId: "",
+      useTemplate: false,
     });
   };
 
@@ -165,7 +168,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
       showToast("Choose at least one weekday", "danger");
       return;
     }
-    const payload = {
+    const { fromRecurringId, useTemplate, ...payload } = {
       ...taskForm,
       title,
       notes: taskForm.notes.trim(),
@@ -173,6 +176,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
       date: taskForm.type === "once" ? taskForm.date : "",
       weekdays: taskForm.type === "weekday" ? taskForm.weekdays : [],
       active: true,
+      sourceId: taskForm.sourceId || null,
     };
     const next = taskForm.id
       ? { ...data, items: data.items.map(t => t.id === taskForm.id ? payload : t) }
@@ -348,7 +352,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
                     <div className="planner-check-content">
                       <div className="planner-check-title">
                         <span>{task.title}</span>
-                        <span className="planner-chip">{task.type === "weekday" ? "Recurring" : "One time"}</span>
+                        <span className="planner-chip">{task.sourceId ? "Extra" : task.type === "weekday" ? "Recurring" : "One time"}</span>
                         {user && <Assignee user={user} />}
                       </div>
                       {task.notes && <p>{task.notes}</p>}
@@ -374,6 +378,33 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
           <div className="modal-box planner-modal planner-form-modal">
             <h2>{taskForm.id ? "Edit task" : "New task"}</h2>
             <div className="planner-form-grid">
+              {!taskForm.id && (
+                <div>
+                  <label>From recurring task</label>
+                  <select value={taskForm.fromRecurringId} onChange={e => {
+                    const src = data.items.find(t => String(t.id) === e.target.value && t.type === "weekday");
+                    setTaskForm(p => ({
+                      ...p,
+                      fromRecurringId: e.target.value,
+                      title: src ? src.title : p.title,
+                      notes: src ? (src.notes || "") : p.notes,
+                      type: "once",
+                      sourceId: src && !p.useTemplate ? src.id : null,
+                    }));
+                  }}>
+                    <option value="">Start blank</option>
+                    {data.items.filter(t => t.type === "weekday" && t.active !== false).map(t =>
+                      <option key={t.id} value={t.id}>{t.title}</option>)}
+                  </select>
+                  {taskForm.fromRecurringId && (
+                    <label className="planner-inline-check">
+                      <input type="checkbox" checked={taskForm.useTemplate}
+                        onChange={e => setTaskForm(p => ({ ...p, useTemplate: e.target.checked, sourceId: e.target.checked ? null : Number(p.fromRecurringId) }))} />
+                      Use as template (independent copy)
+                    </label>
+                  )}
+                </div>
+              )}
               <div>
                 <label>Task</label>
                 <input value={taskForm.title} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Pack school bags" />
@@ -510,6 +541,7 @@ function DayCard({ day, tone, tasks, completions, userById, onOpen, onAdd, onTog
                 aria-label={done ? "Mark incomplete" : "Mark complete"}
               />
               <span className="planner-day-task-title">{task.title}</span>
+              {task.sourceId && <span className="planner-chip planner-chip--small">Extra</span>}
               {user && <Assignee user={user} small />}
             </div>
           );

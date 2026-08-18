@@ -741,6 +741,12 @@ li.planner-empty-line {
   text-transform: uppercase;
 }
 
+.planner-chip--small {
+  min-height: 18px;
+  padding: 0 6px;
+  font-size: 9px;
+}
+
 .planner-check-actions {
   display: flex;
   gap: 6px;
