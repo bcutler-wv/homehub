@@ -132,6 +132,8 @@ test("temperature toggle flips the unit shown on the dashboard", async ({ page }
   await page.getByRole("button", { name: "Admin" }).first().click();
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByText("Temperature unit")).toBeVisible();
+
   await page.getByRole("button", { name: "°C" }).click();
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved")).toBeVisible();

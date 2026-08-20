@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import TodoTasks from "./TodoTasks";
 
 describe("TodoTasks", () => {
@@ -138,5 +138,38 @@ describe("TodoTasks", () => {
     await waitFor(() => expect(setTasks).toHaveBeenCalled());
     expect(setTasks.mock.calls[0][0].items[0].date).toBe(tuesday);
     expect(screen.queryByRole("button", { name: "Just this week" })).not.toBeInTheDocument();
+  });
+
+  test("deleting a task preserves the moves map for the surviving tasks", async () => {
+    const monday = weekDayKey(0);
+    const tuesday = weekDayKey(1);
+    const setTasks = jest.fn();
+
+    renderBoard({
+      items: [
+        { id: 1, title: "Take out trash", type: "weekday", weekdays: [1, 3, 5], active: true },
+        { id: 2, title: "Water plants", type: "weekday", weekdays: [2, 4], active: true },
+      ],
+      completions: {},
+      // Task 1 was moved off Monday for this week only.
+      moves: { [`1:${monday}`]: tuesday },
+    }, setTasks);
+
+    // Tuesday's checklist holds both the moved task and the one being deleted.
+    const tuesdayCard = Array.from(document.querySelectorAll(".planner-day-card"))
+      .find(card => card.querySelector(".planner-day-name")?.textContent === "Tuesday");
+    fireEvent.click(tuesdayCard);
+
+    const checklist = document.querySelector(".planner-checklist");
+    const row = within(checklist).getByText("Water plants").closest(".planner-check-row");
+    fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+
+    const confirmModal = document.querySelector(".planner-delete-modal");
+    fireEvent.click(within(confirmModal).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(setTasks).toHaveBeenCalled());
+    const next = setTasks.mock.calls[0][0];
+    expect(next.items.map(t => t.id)).toEqual([1]);
+    expect(next.moves).toEqual({ [`1:${monday}`]: tuesday });
   });
 });

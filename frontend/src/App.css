@@ -524,6 +524,10 @@ html, body, #root {
   cursor: grab;
 }
 
+.planner-day-task:active {
+  cursor: grabbing;
+}
+
 .planner-day-task.is-done .planner-day-task-title {
   color: #9b958d;
   text-decoration: line-through;
@@ -543,12 +547,23 @@ html, body, #root {
 }
 
 .planner-day-task-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
   min-height: 18px;
   border-bottom: 1px solid var(--planner-line);
   color: var(--planner-ink);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.3;
+}
+
+.planner-day-task-title-text {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .planner-empty-line {
@@ -747,9 +762,10 @@ li.planner-empty-line {
 }
 
 .planner-chip--small {
-  min-height: 18px;
+  min-height: 16px;
   padding: 0 6px;
   font-size: 9px;
+  flex-shrink: 0;
 }
 
 .planner-check-actions {
@@ -844,6 +860,19 @@ li.planner-empty-line {
 
 .planner-form-grid textarea {
   resize: vertical;
+}
+
+.planner-form-grid .planner-inline-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planner-form-grid .planner-inline-check input {
+  width: auto;
 }
 
 .planner-segmented {
@@ -1690,30 +1719,36 @@ li.planner-empty-line {
   position: absolute;
   top: 100%;
   right: 0;
-  z-index: 5;
+  z-index: 20;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
-  padding: 4px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  width: 156px;
+  padding: 8px;
   border: 1px solid var(--planner-border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--planner-paper);
-  box-shadow: 0 8px 20px rgba(39, 35, 33, 0.18);
+  box-shadow: 0 12px 24px rgba(39, 35, 33, 0.18);
 }
 
 .planner-move-list button {
-  border: 0;
-  border-radius: 5px;
-  padding: 4px 6px;
-  background: none;
+  min-height: 26px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--planner-peach);
   color: var(--planner-ink);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
   cursor: pointer;
 }
 
-.planner-move-list button:hover {
-  background: var(--planner-peach);
+.planner-move-list button:hover:not(:disabled) {
+  border-color: var(--planner-border);
+}
+
+.planner-move-list button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .planner-move-modal {

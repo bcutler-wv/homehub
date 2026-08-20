@@ -654,8 +654,10 @@ function DraggableTaskRow({ task, day, done, user, onToggle, onMove, weekDays })
         }}
         aria-label={done ? "Mark incomplete" : "Mark complete"}
       />
-      <span className="planner-day-task-title">{task.title}</span>
-      {task.sourceId && <span className="planner-chip planner-chip--small">Extra</span>}
+      <span className="planner-day-task-title">
+        <span className="planner-day-task-title-text">{task.title}</span>
+        {task.sourceId && <span className="planner-chip planner-chip--small">Extra</span>}
+      </span>
       {user && <Assignee user={user} small />}
       <MoveMenu task={task} day={day} weekDays={weekDays} onMove={onMove} />
     </div>
@@ -694,11 +696,12 @@ function MoveMenu({ task, day, weekDays = [], onMove }) {
       </button>
       {open && (
         <span className="planner-move-list" role="menu">
-          {weekDays.filter(d => d.key !== day.key).map(d => (
+          {weekDays.map(d => (
             <button
               key={d.key}
               type="button"
               role="menuitem"
+              disabled={d.key === day.key}
               onPointerDown={e => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
