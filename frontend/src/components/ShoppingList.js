@@ -1,6 +1,8 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { apiFetch } from "../lib/api";
 import GroceryIcon, { detectGroceryIcon } from "../lib/GroceryIcon";
+import KrogerSearchModal, { AisleChip, ProductThumb } from "./KrogerSearchModal";
+import { byAisle, groupByAisle, toShoppingItem } from "../lib/krogerMatch";
 
 const G = {
   bg:       "var(--g-bg)",
@@ -72,6 +74,8 @@ const btnSecondary = {
 export default function ShoppingList({ shopping, setShopping, apiEnabled, queueMutation, showToast, onRefresh }) {
   const { stores = [], items = [] } = shopping;
   const [activeStoreId, setActiveStoreId] = useState("all");
+  const [krogerSearch, setKrogerSearch] = useState(null); // { term }
+  const [krogerReady, setKrogerReady] = useState(false);
   const [quickAdd, setQuickAdd] = useState("");
   const [storeModal, setStoreModal] = useState(null);
   const [deleteStoreId, setDeleteStoreId] = useState(null);
@@ -81,8 +85,14 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   const effectiveStoreId = activeStoreId === "all" ? null : (activeStore?.id ?? null);
   const storeItems = activeStoreId === "all" ? items : items.filter(i => i.storeId === effectiveStoreId);
 
-  const unchecked = storeItems.filter(i => !i.checked);
-  const checked   = storeItems.filter(i => i.checked);
+  // A store tagged for Kroger only gets product search once the API is
+  // configured; otherwise it behaves like any other list rather than sending
+  // every add through a modal that can only fail.
+  const hasKrogerStore = stores.some(s => s.vendor === "kroger");
+  const isKrogerStore = activeStore?.vendor === "kroger" && krogerReady;
+  const orderItems = (list) => (isKrogerStore ? [...list].sort(byAisle) : list);
+  const unchecked = orderItems(storeItems.filter(i => !i.checked));
+  const checked   = orderItems(storeItems.filter(i => i.checked));
 
   const toggleItem = async (item) => {
     const updated = { ...item, checked: !item.checked };
@@ -102,11 +112,24 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     }
   };
 
+  useEffect(() => {
+    if (!apiEnabled || !hasKrogerStore) { setKrogerReady(false); return undefined; }
+    let cancelled = false;
+    apiFetch("/api/kroger/status")
+      .then(status => { if (!cancelled) setKrogerReady(Boolean(status?.configured)); })
+      .catch(() => { if (!cancelled) setKrogerReady(false); });
+    return () => { cancelled = true; };
+  }, [apiEnabled, hasKrogerStore]);
+
   const addItem = async () => {
     const targetStore = activeStoreId === "all"
       ? stores[0]
       : (stores.find(s => s.id === activeStoreId) || stores[0]);
     if (!quickAdd.trim() || !targetStore) return;
+    if (targetStore.vendor === "kroger" && krogerReady) {
+      setKrogerSearch({ term: quickAdd.trim() });
+      return;
+    }
     const name = quickAdd.trim();
     const newItem = { id: Date.now(), storeId: targetStore.id, name, checked: false };
     setShopping(s => ({ ...s, items: [...s.items, newItem] }));
@@ -135,6 +158,50 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
       return;
     }
     try { await apiFetch(`/api/shopping/items/${item.id}`, { method: "DELETE" }); } catch {}
+  };
+
+  const addKrogerItem = async (product) => {
+    const targetStore = activeStore || stores[0];
+    if (!targetStore) return;
+    const term = krogerSearch?.term || "";
+    const payload = product
+      ? toShoppingItem(product, { storeId: targetStore.id, line: term })
+      : { storeId: targetStore.id, name: term, kroger: null };
+
+    const optimistic = { ...payload, id: Date.now(), checked: false };
+    setShopping(s => ({ ...s, items: [...s.items, optimistic] }));
+    setKrogerSearch(null);
+    setQuickAdd("");
+    quickRef.current?.focus();
+
+    const rememberBody = product ? { term, product } : null;
+
+    if (!apiEnabled) {
+      queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body: payload, resource: "shopping", tempId: optimistic.id });
+      if (rememberBody) {
+        queueMutation?.({ method: "POST", endpoint: "/api/kroger/matches", body: rememberBody, resource: "krogerMatches", tempId: `match-${optimistic.id}` });
+      }
+      return;
+    }
+    try {
+      const d = await apiFetch("/api/shopping/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (d) setShopping(s => ({ ...s, items: s.items.map(i => i.id === optimistic.id ? d : i) }));
+      if (rememberBody) {
+        // Merged server-side, so a hiccup here cannot drop other remembered matches.
+        await apiFetch("/api/kroger/matches", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(rememberBody),
+        }).catch(() => {});
+      }
+    } catch (err) {
+      setShopping(s => ({ ...s, items: s.items.filter(i => i.id !== optimistic.id) }));
+      showToast?.(err.message || "Could not add item", "danger");
+    }
   };
 
   const clearChecked = async () => {
@@ -314,7 +381,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
               disabled={activeStoreId === "all" && stores.length === 0}
             />
             <button style={{ ...btnPrimary, padding: "9px 18px", flexShrink: 0 }} onClick={addItem}>
-              Add
+              {isKrogerStore ? "Find" : "Add"}
             </button>
           </div>
 
@@ -326,22 +393,59 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
           )}
 
           {unchecked.length > 0 && (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
-              gap: 12,
-            }}>
-              {unchecked.map(item => (
-                <ItemCard
-                  key={item.id}
-                  item={item}
-                  storeName={activeStoreId === "all" ? stores.find(s => s.id === item.storeId)?.name : null}
-                  storeColor={stores.find(s => s.id === item.storeId)?.color}
-                  onToggle={toggleItem}
-                  onDelete={deleteItem}
-                />
-              ))}
-            </div>
+            isKrogerStore ? (
+              // Sectioned in the order you walk the store.
+              <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+                {groupByAisle(unchecked).map(group => (
+                  <div key={group.key}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+                        textTransform: "uppercase", color: "var(--g-sky)", fontFamily: G.sans,
+                      }}>
+                        {group.label}
+                      </span>
+                      <span style={{ flex: 1, height: 1, background: G.hair }} />
+                      <span style={{ fontSize: 11, color: G.mute2, fontFamily: G.sans }}>
+                        {group.items.length}
+                      </span>
+                    </div>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
+                      gap: 12,
+                    }}>
+                      {group.items.map(item => (
+                        <ItemCard
+                          key={item.id}
+                          item={item}
+                          storeColor={stores.find(s => s.id === item.storeId)?.color}
+                          onToggle={toggleItem}
+                          onDelete={deleteItem}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
+                gap: 12,
+              }}>
+                {unchecked.map(item => (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    storeName={activeStoreId === "all" ? stores.find(s => s.id === item.storeId)?.name : null}
+                    storeColor={stores.find(s => s.id === item.storeId)?.color}
+                    onToggle={toggleItem}
+                    onDelete={deleteItem}
+                  />
+                ))}
+              </div>
+            )
           )}
 
           {/* Checked / In cart */}
@@ -374,6 +478,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
                     item={item}
                     storeName={activeStoreId === "all" ? stores.find(s => s.id === item.storeId)?.name : null}
                     storeColor={stores.find(s => s.id === item.storeId)?.color}
+                    showAisle={isKrogerStore}
                     onToggle={toggleItem}
                     onDelete={deleteItem}
                   />
@@ -398,6 +503,17 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
       )}
 
       {/* Store modal */}
+      {krogerSearch && (
+        <KrogerSearchModal
+          initialTerm={krogerSearch.term}
+          title={`Add to ${activeStore?.name || "Kroger"}`}
+          onPick={addKrogerItem}
+          onSkip={() => addKrogerItem(null)}
+          skipLabel={`Add “${krogerSearch.term}” as text`}
+          onClose={() => setKrogerSearch(null)}
+        />
+      )}
+
       {storeModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setStoreModal(null)}>
           <div className="modal-box" style={{ maxWidth: 380 }}>
@@ -508,9 +624,11 @@ function StoreTab({ active, label, color, count, onClick, onEdit }) {
   );
 }
 
-function ItemCard({ item, storeName, storeColor, onToggle, onDelete }) {
+function ItemCard({ item, storeName, storeColor, showAisle = false, onToggle, onDelete }) {
   const [hover, setHover] = useState(false);
   const iconKey = detectGroceryIcon(item.name);
+  const kroger = item.kroger || null;
+  const price = kroger?.promoPrice ?? kroger?.price ?? null;
 
   return (
     <div
@@ -568,20 +686,26 @@ function ItemCard({ item, storeName, storeColor, onToggle, onDelete }) {
         </button>
       )}
 
-      {/* Icon */}
-      <div style={{
-        width: 48, height: 48,
-        borderRadius: 14,
-        background: item.checked ? "var(--g-bg)" : "var(--g-sage-bg)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <GroceryIcon
-          name={iconKey}
-          size={28}
-          stroke={item.checked ? "var(--g-mute2)" : "var(--g-sage-dark)"}
-          strokeWidth={2}
-        />
-      </div>
+      {/* Product photo when Kroger gave us one, otherwise the drawn icon */}
+      {kroger?.image ? (
+        <span style={{ opacity: item.checked ? 0.55 : 1 }}>
+          <ProductThumb src={kroger.image} alt="" size={48} radius={14} />
+        </span>
+      ) : (
+        <div style={{
+          width: 48, height: 48,
+          borderRadius: 14,
+          background: item.checked ? "var(--g-bg)" : "var(--g-sage-bg)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <GroceryIcon
+            name={iconKey}
+            size={28}
+            stroke={item.checked ? "var(--g-mute2)" : "var(--g-sage-dark)"}
+            strokeWidth={2}
+          />
+        </div>
+      )}
 
       <span style={{
         fontSize: 13, fontWeight: 600,
@@ -601,6 +725,23 @@ function ItemCard({ item, storeName, storeColor, onToggle, onDelete }) {
           {item.quantity}
         </span>
       )}
+
+      {kroger && (kroger.brand || kroger.size) && (
+        <span style={{ fontSize: 10.5, color: "var(--g-mute2)", fontFamily: "var(--g-sans)", textAlign: "center", lineHeight: 1.25 }}>
+          {[kroger.brand, kroger.size].filter(Boolean).join(" · ")}
+        </span>
+      )}
+
+      {typeof price === "number" && (
+        <span style={{
+          fontFamily: "var(--g-serif)", fontSize: 17, lineHeight: 1,
+          color: item.checked ? "var(--g-mute2)" : "var(--g-ink)",
+        }}>
+          ${price.toFixed(2)}
+        </span>
+      )}
+
+      {showAisle && kroger?.aisle && <AisleChip aisle={kroger.aisle} bay={kroger.bay} small />}
 
       {storeName && (
         <span style={{

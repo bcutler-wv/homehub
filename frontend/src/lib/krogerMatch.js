@@ -86,14 +86,24 @@ export const buildDraftRows = (ingredientLines, matches) => {
   }, []);
 };
 
+export const UNLOCATED = "Not located";
+
 // Aisle labels sort as "AISLE 2" before "AISLE 10", with named departments
 // (DAIRY, MEAT) after the numbered aisles and unmatched items last.
 const aisleRank = (item) => {
-  const aisle = item?.kroger?.aisle;
+  const aisle = String(item?.kroger?.aisle || "").trim();
   if (!aisle) return [3, 0, ""];
   const numbered = /^aisle\s+(\d+)/i.exec(aisle);
   if (numbered) return [1, parseInt(numbered[1], 10), ""];
   return [2, 0, aisle.toUpperCase()];
+};
+
+/** The section an item belongs to: stable, and matching how aisleRank compares. */
+export const aisleGroupKey = (item) => {
+  const [rank, num, name] = aisleRank(item);
+  if (rank === 3) return "\u0000unlocated";
+  if (rank === 1) return `aisle-${num}`;
+  return `dept-${name}`;
 };
 
 export const byAisle = (a, b) => {
@@ -106,6 +116,26 @@ export const byAisle = (a, b) => {
   const bayB = parseInt(b?.kroger?.bay, 10);
   if (Number.isFinite(bayA) && Number.isFinite(bayB) && bayA !== bayB) return bayA - bayB;
   return String(a?.name || "").localeCompare(String(b?.name || ""));
+};
+
+/**
+ * Group a Kroger list into the sections you walk: numbered aisles in order,
+ * then named departments, then anything without a known location.
+ */
+export const groupByAisle = (items) => {
+  const sorted = [...(items || [])].sort(byAisle);
+  const groups = [];
+  sorted.forEach(item => {
+    const key = aisleGroupKey(item);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) { last.items.push(item); return; }
+    groups.push({
+      key,
+      label: item?.kroger?.aisle ? item.kroger.aisle.trim().toUpperCase() : UNLOCATED,
+      items: [item],
+    });
+  });
+  return groups;
 };
 
 /** Shape a search result plus its source line into a shopping item payload. */

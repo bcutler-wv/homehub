@@ -1180,6 +1180,25 @@ app.put("/api/kroger/matches", (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Merge one remembered choice. The bulk PUT replaces the whole map, so a client
+// that built its payload from a failed GET would wipe every other match; adding
+// a single entry goes through here instead.
+app.post("/api/kroger/matches", (req, res, next) => {
+  try {
+    const { term, product } = parsePayload(req) || {};
+    const key = String(term || "").trim().toLowerCase();
+    if (!key) throw Object.assign(new Error("term is required"), { status: 400 });
+    if (!product || typeof product !== "object" || !product.productId) {
+      throw Object.assign(new Error("product with a productId is required"), { status: 400 });
+    }
+    const matches = safeLoad(KROGER_MATCHES_FILE, {});
+    matches[key] = product;
+    saveFile(KROGER_MATCHES_FILE, matches);
+    broadcast("krogerMatches");
+    res.json({ term: key, product });
+  } catch (err) { next(err); }
+});
+
 app.get("/api/kroger/locations", async (req, res, next) => {
   try {
     res.json({ locations: await kroger.searchLocations({ zipCode: req.query.zip, limit: req.query.limit }) });

@@ -183,6 +183,31 @@ test("shopping stores carry a vendor tag, inferred by name for existing stores",
   await agent.post("/api/shopping/stores").send({ name: "Aldi", vendor: "safeway" }).expect(400);
 });
 
+test("remembering one kroger match preserves the others", async () => {
+  removeDataFiles("krogerMatches.json", "activity.json");
+  const agent = await loginAs();
+
+  await agent.post("/api/kroger/matches")
+    .send({ term: "Red lentils", product: { productId: "1", description: "Kroger Red Lentils" } })
+    .expect(200);
+  await agent.post("/api/kroger/matches")
+    .send({ term: "garlic", product: { productId: "2", description: "Kroger Garlic" } })
+    .expect(200);
+
+  const all = await agent.get("/api/kroger/matches").expect(200);
+  assert.deepEqual(Object.keys(all.body).sort(), ["garlic", "red lentils"]);
+  assert.equal(all.body["red lentils"].productId, "1");
+
+  await agent.post("/api/kroger/matches").send({ term: "", product: { productId: "3" } }).expect(400);
+  await agent.post("/api/kroger/matches").send({ term: "onion" }).expect(400);
+
+  // The bulk PUT still replaces wholesale, for editing the map as a document.
+  const replaced = await agent.put("/api/kroger/matches")
+    .send({ onion: { productId: "9" } })
+    .expect(200);
+  assert.deepEqual(Object.keys(replaced.body), ["onion"]);
+});
+
 test("kroger status reports configuration and falls back to the deployment store", async () => {
   removeDataFiles("settings.json", "activity.json");
   const agent = await loginAs();

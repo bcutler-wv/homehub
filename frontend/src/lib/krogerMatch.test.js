@@ -1,6 +1,6 @@
 import {
   searchTermFor, matchKey, isPantryStaple, lookupMatch, rememberMatch, forgetMatch,
-  buildDraftRows, byAisle, toShoppingItem,
+  buildDraftRows, byAisle, groupByAisle, toShoppingItem,
 } from "./krogerMatch";
 
 describe("searchTermFor", () => {
@@ -153,5 +153,53 @@ describe("toShoppingItem", () => {
     const payload = toShoppingItem(null, { storeId: 3, line: "2 cloves garlic" });
     expect(payload.name).toBe("garlic");
     expect(payload.kroger).toBeNull();
+  });
+});
+
+describe("groupByAisle", () => {
+  const item = (name, aisle, bay) => ({ name, kroger: aisle ? { aisle, bay } : null });
+
+  test("sections the list in walk order with unlocated items last", () => {
+    const groups = groupByAisle([
+      item("milk", "DAIRY"),
+      item("bread", null),
+      item("lentils", "AISLE 8"),
+      item("rice", "AISLE 2"),
+      item("yogurt", "DAIRY"),
+    ]);
+
+    expect(groups.map(g => g.label)).toEqual(["AISLE 2", "AISLE 8", "DAIRY", "Not located"]);
+    expect(new Set(groups.map(g => g.key)).size).toBe(groups.length);
+    expect(groups[2].items.map(i => i.name)).toEqual(["milk", "yogurt"]);
+    expect(groups[3].items.map(i => i.name)).toEqual(["bread"]);
+  });
+
+  test("returns nothing for an empty list", () => {
+    expect(groupByAisle([])).toEqual([]);
+    expect(groupByAisle(undefined)).toEqual([]);
+  });
+});
+
+describe("groupByAisle label collisions", () => {
+  const item = (name, aisle) => ({ name, kroger: aisle ? { aisle } : null });
+
+  test("labels differing only in case or spacing form one section", () => {
+    const groups = groupByAisle([
+      item("a", "Aisle 2"),
+      item("b", "AISLE 2"),
+      item("c", "  aisle 2 "),
+      item("d", "Dairy"),
+      item("e", "DAIRY"),
+    ]);
+
+    expect(groups.map(g => g.label)).toEqual(["AISLE 2", "DAIRY"]);
+    expect(groups[0].items).toHaveLength(3);
+    expect(groups[1].items).toHaveLength(2);
+  });
+
+  test("an aisle literally named like the sentinel stays separate from unlocated items", () => {
+    const groups = groupByAisle([item("real", "Not located"), item("none", null)]);
+    expect(groups).toHaveLength(2);
+    expect(new Set(groups.map(g => g.key)).size).toBe(2);
   });
 });
