@@ -46,6 +46,8 @@ export default function Admin({ currentUser, settings, applySettings, apiEnabled
       document.head.appendChild(link);
     }
     if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+    // Drop it on the way out so it does not compete with the link applyFonts owns.
+    return () => { document.getElementById("homehub-font-preview")?.remove(); };
   }, [tab, settingsForm?.headingFont, settingsForm?.bodyFont]);
 
   useEffect(() => {

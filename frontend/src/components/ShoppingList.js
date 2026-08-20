@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { apiFetch } from "../lib/api";
 import GroceryIcon, { detectGroceryIcon } from "../lib/GroceryIcon";
 import KrogerSearchModal, { AisleChip, ProductThumb } from "./KrogerSearchModal";
-import { byAisle, groupByAisle, toShoppingItem } from "../lib/krogerMatch";
+import { byAisle, groupByAisle, searchTermFor, toShoppingItem } from "../lib/krogerMatch";
 
 const G = {
   bg:       "var(--g-bg)",
@@ -183,7 +183,8 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     setQuickAdd("");
     quickRef.current?.focus();
 
-    const rememberBody = product ? { term, product } : null;
+    // Stored under the normalized term so lookups from a recipe line resolve.
+    const rememberBody = product ? { term: searchTermFor(term), product } : null;
 
     if (!apiEnabled) {
       queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body: payload, resource: "shopping", tempId: optimistic.id });

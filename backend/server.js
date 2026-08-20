@@ -305,6 +305,9 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Mirrors the catalog in frontend/src/lib/fonts.js — the ids land in a
+// stylesheet, so they are allow-listed here rather than trusted. Adding a face
+// there without adding it here makes the setting silently refuse to save.
 const HEADING_FONT_IDS = ["instrument-serif", "fraunces", "playfair", "dm-serif", "libre-baskerville", "space-grotesk", "outfit"];
 const BODY_FONT_IDS = ["dm-sans", "inter", "work-sans", "nunito-sans", "source-sans", "karla", "lora"];
 

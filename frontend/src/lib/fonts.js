@@ -3,6 +3,10 @@
 //
 // `spec` is the Google Fonts css2 family fragment, including the axis ranges we
 // actually use. Only the chosen faces get requested at runtime.
+//
+// The ids here are mirrored by HEADING_FONT_IDS / BODY_FONT_IDS in
+// backend/server.js, which allow-lists what the settings endpoint will store.
+// Adding a face here needs the same id added there or it will not save.
 
 export const HEADING_FONTS = [
   { id: "instrument-serif", label: "Instrument Serif", stack: '"Instrument Serif", Georgia, serif', spec: "Instrument+Serif:ital@0;1" },

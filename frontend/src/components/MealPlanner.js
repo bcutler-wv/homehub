@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { apiFetch } from "../lib/api";
 import { getWeekDays, useTodayKey } from "../lib/utils";
+import KrogerSearchModal, { AisleChip, ProductThumb } from "./KrogerSearchModal";
+import { buildDraftRows, toShoppingItem } from "../lib/krogerMatch";
 
 const CATEGORIES = ["Fish", "Pasta", "Meat", "Veg", "Baking"];
 const FILTER_TABS = ["All", "Favourites", ...CATEGORIES];
@@ -56,6 +58,9 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [deleteRecipeId, setDeleteRecipeId] = useState(null);
   const [shoppingDraft, setShoppingDraft] = useState(null);
+  const [krogerReady, setKrogerReady] = useState(false);
+  const [rowSearch, setRowSearch] = useState(null); // index of the row being re-picked
+  const draftTicket = useRef(0);
   const recipeFileRef = useRef();
 
   const todayKey = useTodayKey();
@@ -84,6 +89,19 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
 
   const getRecipeById = (id) => recipes.find(r => String(r.id) === String(id)) || null;
   const defaultStoreId = shopping.stores?.[0]?.id || "";
+  const krogerStore = (shopping.stores || []).find(st => st.vendor === "kroger") || null;
+  // Ingredients resolve to real products only when there is a Kroger list to put
+  // them on and the API is actually configured; otherwise the old picker runs.
+  const krogerFlow = Boolean(krogerStore) && krogerReady;
+
+  useEffect(() => {
+    if (!apiEnabled || !krogerStore) { setKrogerReady(false); return undefined; }
+    let cancelled = false;
+    apiFetch("/api/kroger/status")
+      .then(status => { if (!cancelled) setKrogerReady(Boolean(status?.configured)); })
+      .catch(() => { if (!cancelled) setKrogerReady(false); });
+    return () => { cancelled = true; };
+  }, [apiEnabled, krogerStore]);
 
   const filteredRecipes = recipes.filter(r => {
     if (categoryFilter === "Favourites" && !r.isFavourite) return false;
@@ -207,7 +225,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
     showToast("Recipe deleted", "danger");
   };
 
-  const openShoppingDraft = (source, recipe = null) => {
+  const openShoppingDraft = async (source, recipe = null) => {
     const selectedRecipes = source === "week"
       ? weekDays.map(day => mealPlan[day.key]?.recipeId).filter(Boolean).map(getRecipeById).filter(Boolean)
       : [recipe].filter(Boolean);
@@ -221,17 +239,130 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
       return true;
     });
     if (!items.length) return showToast("No ingredients to add", "danger");
-    setShoppingDraft({ source, storeId: defaultStoreId, items, checked: Object.fromEntries(items.map((_, i) => [i, true])) });
+
+    if (!krogerFlow) {
+      setShoppingDraft({ source, storeId: defaultStoreId, items, checked: Object.fromEntries(items.map((_, i) => [i, true])) });
+      return;
+    }
+
+    // Remembered choices resolve silently; the rest get a suggestion to eyeball.
+    const ticket = ++draftTicket.current;
+    const matches = await apiFetch("/api/kroger/matches").catch(() => ({}));
+    // buildDraftRows collapses by normalized term while `items` collapsed by full
+    // name, so the two lists can differ in length — join on the line, not index.
+    const byLine = new Map(items.map(it => [it.name, it]));
+    const rows = buildDraftRows(items.map(i => i.name), matches || {}).map(row => {
+      const source = byLine.get(row.line) || null;
+      return {
+        ...row,
+        recipeId: source?.recipeId ?? null,
+        recipeName: source?.recipeName ?? null,
+        suggested: false,
+      };
+    });
+    setShoppingDraft({ source, mode: "kroger", storeId: krogerStore.id, rows, resolving: true });
+
+    // A week of recipes is easily 30+ ingredients; run them a few at a time so
+    // the proxy is not hit with everything at once.
+    const pending = rows.filter(row => !row.product && !row.staple);
+    const found = new Map();
+    for (let i = 0; i < pending.length; i += 4) {
+      if (draftTicket.current !== ticket) return;
+      await Promise.all(pending.slice(i, i + 4).map(async (row) => {
+        try {
+          const data = await apiFetch(`/api/kroger/search?term=${encodeURIComponent(row.term)}&limit=1`);
+          const top = (data.products || [])[0] || null;
+          if (top) found.set(row.term, top);
+        } catch { /* leave it to fall through as plain text */ }
+      }));
+    }
+
+    setShoppingDraft(prev => {
+      // Only touch the draft these searches were started for, and never clobber
+      // a product the user picked or an include they toggled while waiting.
+      if (!prev || prev.mode !== "kroger" || draftTicket.current !== ticket) return prev;
+      return {
+        ...prev,
+        resolving: false,
+        rows: prev.rows.map(r => (r.product || !found.has(r.term))
+          ? r
+          : { ...r, product: found.get(r.term), suggested: true }),
+      };
+    });
+  };
+
+  const closeDraft = () => {
+    draftTicket.current += 1; // abandon any in-flight resolution
+    setRowSearch(null);
+    setShoppingDraft(null);
+  };
+
+  const addKrogerDraft = async () => {
+    const storeId = shoppingDraft.storeId;
+    const chosen = shoppingDraft.rows.filter(row => row.include);
+    const existing = new Set((shopping.items || [])
+      .filter(item => String(item.storeId) === String(storeId) && !item.checked)
+      .map(item => item.name?.trim().toLowerCase()));
+
+    const payloads = chosen
+      .map(row => ({ row, payload: toShoppingItem(row.product, { storeId, line: row.line, recipeId: row.recipeId }) }))
+      .filter(({ payload }) => !existing.has(payload.name.trim().toLowerCase()));
+
+    if (!payloads.length) {
+      closeDraft();
+      return showToast("All selected ingredients are already on that list");
+    }
+
+    if (apiEnabled) {
+      const created = [];
+      for (const { payload } of payloads) {
+        const result = await apiFetch("/api/shopping/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, source: shoppingDraft.source }),
+        });
+        if (result) created.push(result);
+      }
+      setShopping?.(prev => ({ ...prev, items: [...(prev.items || []), ...created] }));
+      // Only what was actually added is worth remembering.
+      await Promise.all(payloads
+        .filter(({ row }) => row.product && !row.suggested)
+        .map(({ row }) => apiFetch("/api/kroger/matches", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ term: row.term, product: row.product }),
+        }).catch(() => {})));
+    } else {
+      const maxId = (shopping.items || []).reduce((m, item) => Math.max(m, item.id || 0), 0);
+      payloads.forEach(({ row, payload }, i) => {
+        const body = { ...payload, source: shoppingDraft.source };
+        queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body, resource: "shopping", tempId: maxId + i + 1 });
+        if (row.product && !row.suggested) {
+          queueMutation?.({
+            method: "POST", endpoint: "/api/kroger/matches",
+            body: { term: row.term, product: row.product },
+            resource: "krogerMatches", tempId: `match-${maxId + i + 1}`,
+          });
+        }
+      });
+      const created = payloads.map(({ payload }, i) => ({ ...payload, id: maxId + i + 1, checked: false, source: shoppingDraft.source }));
+      setShopping?.(prev => ({ ...prev, items: [...(prev.items || []), ...created] }));
+    }
+
+    closeDraft();
+    const matchedCount = payloads.filter(({ row }) => row.product).length;
+    showToast(`${payloads.length} added to ${krogerStore?.name || "Kroger"}${matchedCount ? ` · ${matchedCount} matched` : ""}`);
   };
 
   const addShoppingDraft = async () => {
+    if (shoppingDraft?.mode === "kroger") return addKrogerDraft();
     if (!shoppingDraft?.storeId) return showToast("Choose a target store first", "danger");
     const selected = shoppingDraft.items.filter((_, i) => shoppingDraft.checked[i]);
     const existing = new Set((shopping.items || [])
       .filter(item => String(item.storeId) === String(shoppingDraft.storeId) && !item.checked)
       .map(item => item.name?.trim().toLowerCase()));
     const toAdd = selected.filter(item => !existing.has(item.name.trim().toLowerCase()));
-    if (!toAdd.length) { setShoppingDraft(null); return showToast("All selected ingredients are already on that list"); }
+    if (!toAdd.length) { closeDraft(); return showToast("All selected ingredients are already on that list"); }
 
     if (apiEnabled) {
       const created = [];
@@ -250,7 +381,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
       created.forEach(item => queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body: { name: item.name, storeId: item.storeId, source: item.source, recipeId: item.recipeId }, resource: "shopping", tempId: item.id }));
       setShopping?.(prev => ({ ...prev, items: [...(prev.items || []), ...created] }));
     }
-    setShoppingDraft(null);
+    closeDraft();
     showToast(`${toAdd.length} ingredient${toAdd.length === 1 ? "" : "s"} added`);
   };
 
@@ -693,8 +824,103 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
         </div>
       )}
 
-      {shoppingDraft && (
-        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShoppingDraft(null)}>
+      {shoppingDraft?.mode === "kroger" && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && closeDraft()}>
+          <div className="modal-box" style={{ maxWidth: 560, width: "100%" }}>
+            <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 400, fontFamily: "var(--g-serif)", color: "var(--g-ink)" }}>
+              Add to {krogerStore?.name || "Kroger"}
+            </h2>
+            <p style={{ margin: "0 0 14px", fontSize: 12.5, color: "var(--g-muted)" }}>
+              {shoppingDraft.resolving
+                ? "Matching ingredients to products…"
+                : "Tap a product to swap it. Unmatched ingredients are added as plain text."}
+            </p>
+
+            <div style={{ maxHeight: 340, overflowY: "auto", border: "1px solid var(--g-hair)", borderRadius: 14, padding: 6 }}>
+              {shoppingDraft.rows.map((row, i) => (
+                <div
+                  key={`${row.term}-${i}`}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "8px 8px", borderRadius: 10,
+                    opacity: row.include ? 1 : 0.45,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={row.include}
+                    aria-label={`Include ${row.term}`}
+                    onChange={e => setShoppingDraft(p => ({
+                      ...p,
+                      rows: p.rows.map((r, j) => j === i ? { ...r, include: e.target.checked } : r),
+                    }))}
+                  />
+                  <ProductThumb src={row.product?.image} alt="" size={36} radius={10} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--g-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {row.product ? row.product.description : row.term}
+                    </span>
+                    <span style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 3, flexWrap: "wrap" }}>
+                      {row.product ? (
+                        <>
+                          <span style={{ fontSize: 11, color: "var(--g-mute2)" }}>{row.line}</span>
+                          <AisleChip aisle={row.product.aisle} bay={row.product.bay} small />
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "var(--g-mute2)" }}>
+                          {row.staple ? "pantry staple · added as text" : "no match · added as text"}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  {typeof (row.product?.promoPrice ?? row.product?.price) === "number" && (
+                    <span style={{ fontFamily: "var(--g-serif)", fontSize: 16, color: "var(--g-ink)", flexShrink: 0 }}>
+                      ${(row.product.promoPrice ?? row.product.price).toFixed(2)}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setRowSearch(i)}
+                    style={{ all: "unset", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "var(--g-sage-dark)", padding: "4px 6px", flexShrink: 0 }}
+                  >
+                    {row.product ? "Change" : "Find"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={modalFooterStyle}>
+              <button onClick={() => closeDraft()} style={cancelBtnStyle}>Cancel</button>
+              <button onClick={addShoppingDraft} style={primaryBtnStyle} disabled={shoppingDraft.resolving}>
+                Add {shoppingDraft.rows.filter(r => r.include).length}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {rowSearch !== null && shoppingDraft?.rows?.[rowSearch] && (
+        <KrogerSearchModal
+          initialTerm={shoppingDraft.rows[rowSearch].term}
+          title={`Match “${shoppingDraft.rows[rowSearch].term}”`}
+          onPick={(product) => {
+            setShoppingDraft(p => (p?.rows
+              ? { ...p, rows: p.rows.map((r, j) => j === rowSearch ? { ...r, product, suggested: false } : r) }
+              : p));
+            setRowSearch(null);
+          }}
+          onSkip={() => {
+            setShoppingDraft(p => (p?.rows
+              ? { ...p, rows: p.rows.map((r, j) => j === rowSearch ? { ...r, product: null, suggested: false } : r) }
+              : p));
+            setRowSearch(null);
+          }}
+          skipLabel="Add as plain text"
+          onClose={() => setRowSearch(null)}
+        />
+      )}
+
+      {shoppingDraft && shoppingDraft.mode !== "kroger" && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && closeDraft()}>
           <div className="modal-box" style={{ maxWidth: 520 }}>
             <h2 style={{ margin: "0 0 18px", fontSize: 22, fontWeight: 400, fontFamily: "var(--g-serif)", color: "var(--g-ink)" }}>
               Add ingredients
@@ -718,7 +944,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
               </div>
             </div>
             <div style={modalFooterStyle}>
-              <button onClick={() => setShoppingDraft(null)} style={cancelBtnStyle}>Cancel</button>
+              <button onClick={() => closeDraft()} style={cancelBtnStyle}>Cancel</button>
               <button onClick={addShoppingDraft} style={primaryBtnStyle}>Add selected</button>
             </div>
           </div>
