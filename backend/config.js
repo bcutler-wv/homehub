@@ -25,4 +25,7 @@ module.exports = {
   CORS_ORIGIN: process.env.CORS_ORIGIN || null,
   SESSION_SECRET: process.env.SESSION_SECRET || null,
   COOKIE_SECURE: process.env.COOKIE_SECURE === "true",
+  KROGER_CLIENT_ID: process.env.KROGER_CLIENT_ID || null,
+  KROGER_CLIENT_SECRET: process.env.KROGER_CLIENT_SECRET || null,
+  KROGER_API_BASE: process.env.KROGER_API_BASE || "https://api.kroger.com/v1",
 };

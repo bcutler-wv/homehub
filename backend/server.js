@@ -13,6 +13,7 @@ const { diskUpload, memUpload, zipUpload, sanitizeFilename, validateMagicBytes }
 const errorHandler = require("./middleware/error");
 const { validateInvoice, validatePlant, validateRecipe, validateMaintenanceTask, validateTasksData } = require("./middleware/validate");
 const { extract } = require("./services/ocr");
+const kroger = require("./services/kroger");
 
 const {
   PORT,
@@ -315,7 +316,7 @@ const DEFAULT_ENABLED_FEATURES = {
   contacts: true,
   inventory: true,
 };
-const SAMPLE_SETTINGS = { appName: "HomeHub", householdName: "", currency: "EUR", accentColor: "#16a34a", location: "New York", temperatureUnit: "fahrenheit", enabledFeatures: DEFAULT_ENABLED_FEATURES };
+const SAMPLE_SETTINGS = { appName: "HomeHub", householdName: "", currency: "EUR", accentColor: "#16a34a", location: "New York", temperatureUnit: "fahrenheit", krogerLocationId: "", enabledFeatures: DEFAULT_ENABLED_FEATURES };
 
 const normalizeSettings = (settings = {}) => ({
   ...SAMPLE_SETTINGS,
@@ -848,7 +849,7 @@ app.get("/api/settings", (_, res) => res.json(normalizeSettings(safeLoad(SETTING
 app.put("/api/settings", requireAdmin, (req, res, next) => {
   try {
     const current = normalizeSettings(safeLoad(SETTINGS_FILE, SAMPLE_SETTINGS));
-    const { appName, householdName, currency, accentColor, location, temperatureUnit, enabledFeatures } = parsePayload(req);
+    const { appName, householdName, currency, accentColor, location, temperatureUnit, krogerLocationId, enabledFeatures } = parsePayload(req);
     const updated = {
       ...current,
       ...(appName !== undefined && { appName: String(appName).trim() || current.appName }),
@@ -857,6 +858,7 @@ app.put("/api/settings", requireAdmin, (req, res, next) => {
       ...(accentColor !== undefined && { accentColor: String(accentColor) }),
       ...(location !== undefined && { location: String(location).trim() }),
       ...(temperatureUnit !== undefined && ["fahrenheit", "celsius"].includes(temperatureUnit) && { temperatureUnit }),
+      ...(krogerLocationId !== undefined && { krogerLocationId: String(krogerLocationId).trim() }),
       ...(enabledFeatures && typeof enabledFeatures === "object" && {
         enabledFeatures: Object.fromEntries(
           Object.keys(DEFAULT_ENABLED_FEATURES).map(key => [key, enabledFeatures[key] !== false])
@@ -1133,6 +1135,33 @@ app.post("/api/recurring-invoices/:id/generate", (req, res, next) => {
     res.json({ invoice, template: templates[idx], skipped: false });
   } catch (err) { next(err); }
 });
+
+// ── Kroger ────────────────────────────────────────────────────────────────────
+
+app.get("/api/kroger/status", (_, res) => {
+  const settings = normalizeSettings(safeLoad(SETTINGS_FILE, SAMPLE_SETTINGS));
+  res.json({ configured: kroger.configured(), locationId: settings.krogerLocationId || "" });
+});
+
+app.get("/api/kroger/search", async (req, res, next) => {
+  try {
+    const settings = normalizeSettings(safeLoad(SETTINGS_FILE, SAMPLE_SETTINGS));
+    const products = await kroger.searchProducts({
+      term: req.query.term,
+      locationId: req.query.locationId || settings.krogerLocationId,
+      limit: req.query.limit,
+    });
+    res.json({ products });
+  } catch (err) { next(err); }
+});
+
+app.get("/api/kroger/locations", async (req, res, next) => {
+  try {
+    res.json({ locations: await kroger.searchLocations({ zipCode: req.query.zip, limit: req.query.limit }) });
+  } catch (err) { next(err); }
+});
+
+// ── Shopping ──────────────────────────────────────────────────────────────────
 
 const SAMPLE_SHOPPING = { stores: [], items: [] };
 const nextShoppingId = (arr) => arr.reduce((m, i) => Math.max(m, i.id || 0), 0) + 1;
