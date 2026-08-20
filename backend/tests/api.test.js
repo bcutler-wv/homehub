@@ -14,6 +14,11 @@ process.env.ADMIN_USERNAME = "admin";
 process.env.ADMIN_PASSWORD = "secret123";
 process.env.SESSION_SECRET = "test-session-secret";
 process.env.COOKIE_SECURE = "false";
+// The suite makes several hundred API calls, and logs in once per test, well
+// inside both limiters' windows. Production defaults (200/min, 10 logins per
+// 15min) are unchanged.
+process.env.RATE_LIMIT_MAX = "100000";
+process.env.LOGIN_RATE_LIMIT_MAX = "1000";
 
 const { app, parseICS } = require("../server");
 
@@ -145,6 +150,30 @@ test("settings temperature unit round-trips and ignores unsupported units", asyn
 
   const rejected = await agent.put("/api/settings").send({ temperatureUnit: "kelvin" }).expect(200);
   assert.equal(rejected.body.temperatureUnit, "celsius");
+});
+
+test("kroger status reports configuration and falls back to the deployment store", async () => {
+  removeDataFiles("settings.json", "activity.json");
+  const agent = await loginAs();
+
+  // No credentials in the test environment, and no store chosen in settings.
+  const status = await agent.get("/api/kroger/status").expect(200);
+  assert.equal(status.body.configured, false);
+  assert.equal(status.body.locationId, "");
+
+  // An explicit choice in settings wins over the environment fallback.
+  await agent.put("/api/settings").send({ krogerLocationId: "02900788" }).expect(200);
+  const chosen = await agent.get("/api/kroger/status").expect(200);
+  assert.equal(chosen.body.locationId, "02900788");
+
+  const settings = await agent.get("/api/settings").expect(200);
+  assert.equal(settings.body.krogerLocationId, "02900788");
+});
+
+test("kroger search is unavailable when the API is not configured", async () => {
+  const agent = await loginAs();
+  const res = await agent.get("/api/kroger/search?term=milk").expect(503);
+  assert.match(res.body.error.message, /not configured/);
 });
 
 test("multipart upload rejects files whose magic bytes do not match supported types", async () => {

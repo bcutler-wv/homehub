@@ -28,4 +28,7 @@ module.exports = {
   KROGER_CLIENT_ID: process.env.KROGER_CLIENT_ID || null,
   KROGER_CLIENT_SECRET: process.env.KROGER_CLIENT_SECRET || null,
   KROGER_API_BASE: process.env.KROGER_API_BASE || "https://api.kroger.com/v1",
+  KROGER_LOCATION_ID: process.env.KROGER_LOCATION_ID || null,
+  RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX || "200", 10),
+  LOGIN_RATE_LIMIT_MAX: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || "10", 10),
 };

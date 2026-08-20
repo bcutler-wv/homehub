@@ -76,7 +76,7 @@ app.use(session({
 
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 200,
+  max: config.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { code: 429, message: "Too many requests, please slow down." } },
@@ -321,6 +321,9 @@ const SAMPLE_SETTINGS = { appName: "HomeHub", householdName: "", currency: "EUR"
 const normalizeSettings = (settings = {}) => ({
   ...SAMPLE_SETTINGS,
   ...settings,
+  // Falls back to the deployment's configured store so a fresh install resolves
+  // prices without anyone visiting Settings first.
+  krogerLocationId: settings.krogerLocationId || config.KROGER_LOCATION_ID || "",
   enabledFeatures: {
     ...DEFAULT_ENABLED_FEATURES,
     ...(settings.enabledFeatures && typeof settings.enabledFeatures === "object" ? settings.enabledFeatures : {}),
@@ -331,7 +334,7 @@ const normalizeSettings = (settings = {}) => ({
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: config.LOGIN_RATE_LIMIT_MAX,
   message: { error: { code: 429, message: "Too many login attempts, please try again later." } },
 });
 
