@@ -76,6 +76,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   const [activeStoreId, setActiveStoreId] = useState("all");
   const [krogerSearch, setKrogerSearch] = useState(null); // { term }
   const [krogerReady, setKrogerReady] = useState(false);
+  const [addStoreId, setAddStoreId] = useState(null); // target while "All stores" is filtered
   const [quickAdd, setQuickAdd] = useState("");
   const [storeModal, setStoreModal] = useState(null);
   const [deleteStoreId, setDeleteStoreId] = useState(null);
@@ -89,7 +90,17 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   // configured; otherwise it behaves like any other list rather than sending
   // every add through a modal that can only fail.
   const hasKrogerStore = stores.some(s => s.vendor === "kroger");
+
+  // Sectioning follows the list you are looking at.
   const isKrogerStore = activeStore?.vendor === "kroger" && krogerReady;
+
+  // Adding follows the store the item will land in, which is the filtered store
+  // or, under "All stores", whichever target is picked beside the box. Product
+  // search must never engage on a store nobody selected.
+  const addTargetStore = activeStoreId === "all"
+    ? (stores.find(st => st.id === addStoreId) || null)
+    : (stores.find(st => st.id === activeStoreId) || null);
+  const addTargetIsKroger = addTargetStore?.vendor === "kroger" && krogerReady;
   const orderItems = (list) => (isKrogerStore ? [...list].sort(byAisle) : list);
   const unchecked = orderItems(storeItems.filter(i => !i.checked));
   const checked   = orderItems(storeItems.filter(i => i.checked));
@@ -122,11 +133,9 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   }, [apiEnabled, hasKrogerStore]);
 
   const addItem = async () => {
-    const targetStore = activeStoreId === "all"
-      ? stores[0]
-      : (stores.find(s => s.id === activeStoreId) || stores[0]);
+    const targetStore = addTargetStore;
     if (!quickAdd.trim() || !targetStore) return;
-    if (targetStore.vendor === "kroger" && krogerReady) {
+    if (addTargetIsKroger) {
       setKrogerSearch({ term: quickAdd.trim() });
       return;
     }
@@ -161,7 +170,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   };
 
   const addKrogerItem = async (product) => {
-    const targetStore = activeStore || stores[0];
+    const targetStore = addTargetStore;
     if (!targetStore) return;
     const term = krogerSearch?.term || "";
     const payload = product
@@ -277,9 +286,9 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     try { await apiFetch(`/api/shopping/stores/${deleteStoreId}`, { method: "DELETE" }); } catch {}
   };
 
-  const addPrompt = activeStoreId === "all"
-    ? (stores.length > 0 ? `Add to ${stores[0]?.name}...` : "Add a store first")
-    : `Add to ${activeStore?.name}...`;
+  const addPrompt = stores.length === 0
+    ? "Add a store first"
+    : (addTargetStore ? `Add to ${addTargetStore.name}...` : "Choose a store...");
 
   const iconKey = detectGroceryIcon(quickAdd);
 
@@ -378,10 +387,34 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
               value={quickAdd}
               onChange={e => setQuickAdd(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addItem()}
-              disabled={activeStoreId === "all" && stores.length === 0}
+              disabled={stores.length === 0}
             />
-            <button style={{ ...btnPrimary, padding: "9px 18px", flexShrink: 0 }} onClick={addItem}>
-              {isKrogerStore ? "Find" : "Add"}
+            {activeStoreId === "all" && stores.length > 0 && (
+              <select
+                value={addStoreId ?? ""}
+                onChange={e => setAddStoreId(e.target.value ? Number(e.target.value) : null)}
+                aria-label="Add to store"
+                style={{
+                  background: "transparent", border: "none", outline: "none",
+                  fontSize: 13, fontWeight: 600, fontFamily: G.sans,
+                  color: addStoreId ? G.ink : G.mute2,
+                  cursor: "pointer", flexShrink: 0, maxWidth: 150,
+                }}
+              >
+                <option value="">Choose store</option>
+                {stores.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+              </select>
+            )}
+            <button
+              style={{
+                ...btnPrimary, padding: "9px 18px", flexShrink: 0,
+                opacity: addTargetStore ? 1 : 0.5,
+                cursor: addTargetStore ? "pointer" : "default",
+              }}
+              onClick={addItem}
+              disabled={!addTargetStore}
+            >
+              {addTargetIsKroger ? "Find" : "Add"}
             </button>
           </div>
 

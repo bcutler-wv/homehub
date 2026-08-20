@@ -142,4 +142,47 @@ describe("ShoppingList Kroger vendor", () => {
     expect(setShopping).toHaveBeenCalled();
     expect(screen.queryByLabelText("Search Kroger products")).not.toBeInTheDocument();
   });
+
+  test("All stores does not silently target Kroger", async () => {
+    mockKrogerStatus(true);
+    const { setShopping } = renderList({ stores: [KROGER, SAMS], items: [] }, { apiEnabled: true });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+
+    // Kroger is first in the list, but no store is selected on either control.
+    expect(screen.getByPlaceholderText("Choose a store...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText("Choose a store..."), { target: { value: "milk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(setShopping).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Search Kroger products")).not.toBeInTheDocument();
+  });
+
+  test("picking Kroger under the Add button hooks product search", async () => {
+    mockKrogerStatus(true);
+    renderList({ stores: [SAMS, KROGER], items: [] }, { apiEnabled: true });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+
+    // Choosing a non-Kroger target keeps the plain add.
+    fireEvent.change(screen.getByLabelText("Add to store"), { target: { value: String(SAMS.id) } });
+    expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
+
+    // Switching the target to Kroger is what turns on search.
+    fireEvent.change(screen.getByLabelText("Add to store"), { target: { value: String(KROGER.id) } });
+    const find = await screen.findByRole("button", { name: "Find" });
+
+    fireEvent.change(screen.getByPlaceholderText("Add to Kroger..."), { target: { value: "red lentils" } });
+    fireEvent.click(find);
+    expect(await screen.findByLabelText("Search Kroger products")).toHaveValue("red lentils");
+  });
+
+  test("the store selector only appears under All stores", async () => {
+    await renderKrogerList({ stores: [KROGER, SAMS], items: [] });
+    expect(screen.getByLabelText("Add to store")).toBeInTheDocument();
+
+    selectStore("Sam's Club");
+    expect(screen.queryByLabelText("Add to store")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Add to Sam's Club/i)).toBeInTheDocument();
+  });
 });
