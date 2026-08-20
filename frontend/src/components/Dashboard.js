@@ -5,7 +5,7 @@ import { fmt, displayStatus, useTodayKey } from "../lib/utils";
 
 const DEFAULT_LOCATION = { latitude: 40.7128, longitude: -74.006, label: "New York" };
 
-function useWeather(location) {
+function useWeather(location, unit) {
   const [weather, setWeather] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +33,8 @@ function useWeather(location) {
         const url =
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
           `&current=temperature_2m,weathercode&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset` +
-          `&timezone=auto&forecast_days=1`;
+          `&timezone=auto&forecast_days=1` +
+          `&temperature_unit=${unit === "celsius" ? "celsius" : "fahrenheit"}`;
         const resp = await fetch(url);
         const data = await resp.json();
         if (cancelled) return;
@@ -57,7 +58,7 @@ function useWeather(location) {
     setWeather(null);
     fetchWeather();
     return () => { cancelled = true; };
-  }, [location]);
+  }, [location, unit]);
   return weather;
 }
 
@@ -76,7 +77,7 @@ function weatherLabel(code) {
   return "Stormy";
 }
 
-function WeatherCard({ weather }) {
+function WeatherCard({ weather, unit }) {
   if (!weather) return null;
   return (
     <div style={{
@@ -101,7 +102,7 @@ function WeatherCard({ weather }) {
       <div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
           <span style={{ fontSize: 26, fontWeight: 400, fontFamily: "var(--g-serif)", color: "var(--g-ink)", lineHeight: 1 }}>
-            {weather.temp}°
+            {weather.temp}°{unit === "celsius" ? "C" : "F"}
           </span>
         </div>
         <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--g-muted)", fontFamily: "var(--g-sans)" }}>
@@ -645,7 +646,8 @@ export default function Dashboard({
   onToggleInvoicePaid, onToggleMaintenanceDone, onWaterPlant,
 }) {
   const isFeatureEnabled = (feature) => enabledFeatures[feature] !== false;
-  const weather = useWeather(settings?.location);
+  const unit = settings?.temperatureUnit === "celsius" ? "celsius" : "fahrenheit";
+  const weather = useWeather(settings?.location, unit);
   const todayKey = useTodayKey();
 
   const now = useMemo(() => new Date(), []);
@@ -728,7 +730,7 @@ export default function Dashboard({
           </p>
         </div>
         <div style={{ flexShrink: 0, paddingTop: 4 }}>
-          <WeatherCard weather={weather} />
+          <WeatherCard weather={weather} unit={unit} />
         </div>
       </div>
 

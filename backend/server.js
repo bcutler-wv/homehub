@@ -315,7 +315,7 @@ const DEFAULT_ENABLED_FEATURES = {
   contacts: true,
   inventory: true,
 };
-const SAMPLE_SETTINGS = { appName: "HomeHub", householdName: "", currency: "EUR", accentColor: "#16a34a", location: "New York", enabledFeatures: DEFAULT_ENABLED_FEATURES };
+const SAMPLE_SETTINGS = { appName: "HomeHub", householdName: "", currency: "EUR", accentColor: "#16a34a", location: "New York", temperatureUnit: "fahrenheit", enabledFeatures: DEFAULT_ENABLED_FEATURES };
 
 const normalizeSettings = (settings = {}) => ({
   ...SAMPLE_SETTINGS,
@@ -848,7 +848,7 @@ app.get("/api/settings", (_, res) => res.json(normalizeSettings(safeLoad(SETTING
 app.put("/api/settings", requireAdmin, (req, res, next) => {
   try {
     const current = normalizeSettings(safeLoad(SETTINGS_FILE, SAMPLE_SETTINGS));
-    const { appName, householdName, currency, accentColor, location, enabledFeatures } = parsePayload(req);
+    const { appName, householdName, currency, accentColor, location, temperatureUnit, enabledFeatures } = parsePayload(req);
     const updated = {
       ...current,
       ...(appName !== undefined && { appName: String(appName).trim() || current.appName }),
@@ -856,6 +856,7 @@ app.put("/api/settings", requireAdmin, (req, res, next) => {
       ...(currency !== undefined && { currency: String(currency) }),
       ...(accentColor !== undefined && { accentColor: String(accentColor) }),
       ...(location !== undefined && { location: String(location).trim() }),
+      ...(temperatureUnit !== undefined && ["fahrenheit", "celsius"].includes(temperatureUnit) && { temperatureUnit }),
       ...(enabledFeatures && typeof enabledFeatures === "object" && {
         enabledFeatures: Object.fromEntries(
           Object.keys(DEFAULT_ENABLED_FEATURES).map(key => [key, enabledFeatures[key] !== false])

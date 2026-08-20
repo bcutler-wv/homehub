@@ -265,6 +265,21 @@ export default function Admin({ currentUser, settings, applySettings, apiEnabled
                 onChange={e => setSettingsForm(f => ({ ...f, location: e.target.value }))}
               />
             </div>
+            <div>
+              <label style={labelStyle}>Temperature unit</label>
+              <div className="planner-segmented">
+                {["fahrenheit", "celsius"].map(unit => (
+                  <button
+                    key={unit}
+                    type="button"
+                    onClick={() => setSettingsForm(f => ({ ...f, temperatureUnit: unit }))}
+                    className={(settingsForm.temperatureUnit || "fahrenheit") === unit ? "is-active" : ""}
+                  >
+                    {unit === "fahrenheit" ? "°F" : "°C"}
+                  </button>
+                ))}
+              </div>
+            </div>
             {featureOptions.length > 0 && (
               <div>
                 <label style={labelStyle}>Enabled features</label>

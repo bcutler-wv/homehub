@@ -130,6 +130,23 @@ test("settings updates require admin and normalize feature flags", async () => {
   assert.equal(res.body.enabledFeatures.shopping, true);
 });
 
+test("settings temperature unit round-trips and ignores unsupported units", async () => {
+  removeDataFiles("settings.json", "activity.json");
+  const agent = await loginAs();
+
+  const defaults = await agent.get("/api/settings").expect(200);
+  assert.equal(defaults.body.temperatureUnit, "fahrenheit");
+
+  const saved = await agent.put("/api/settings").send({ temperatureUnit: "celsius" }).expect(200);
+  assert.equal(saved.body.temperatureUnit, "celsius");
+
+  const reloaded = await agent.get("/api/settings").expect(200);
+  assert.equal(reloaded.body.temperatureUnit, "celsius");
+
+  const rejected = await agent.put("/api/settings").send({ temperatureUnit: "kelvin" }).expect(200);
+  assert.equal(rejected.body.temperatureUnit, "celsius");
+});
+
 test("multipart upload rejects files whose magic bytes do not match supported types", async () => {
   removeDataFiles("invoices.json", "activity.json");
   const agent = await loginAs();
