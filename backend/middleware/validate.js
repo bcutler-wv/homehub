@@ -54,6 +54,15 @@ const validateTasksData = (body) => {
       }
     }
   }
+  if (body.moves !== undefined) {
+    if (!body.moves || typeof body.moves !== "object" || Array.isArray(body.moves)) {
+      throw bad("tasks.moves must be an object");
+    }
+    for (const [key, value] of Object.entries(body.moves)) {
+      if (!/^.+:\d{4}-\d{2}-\d{2}$/.test(key)) throw bad("tasks.moves keys must be taskId:YYYY-MM-DD");
+      if (typeof value !== "string" || !ISO_DATE.test(value)) throw bad("tasks.moves values must be YYYY-MM-DD");
+    }
+  }
 };
 
 module.exports = { validateInvoice, validatePlant, validateRecipe, validateMaintenanceTask, validateTasksData };

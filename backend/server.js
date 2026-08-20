@@ -604,6 +604,7 @@ app.put("/api/tasks", (req, res, next) => {
     const data = {
       items: Array.isArray(payload?.items) ? payload.items : [],
       completions: payload?.completions && typeof payload.completions === "object" ? payload.completions : {},
+      ...(payload?.moves !== undefined ? { moves: payload.moves } : {}),
     };
     validateTasksData(data);
     saveFile(TASKS_FILE, data);

@@ -232,3 +232,25 @@ test("calendar import parses ICS and calendar save deduplicates repeated events"
   assert.equal(saved.body.events.length, 1);
   assert.equal(saved.body.events[0].title, "Dentist");
 });
+
+test("tasks PUT round-trips the moves map and rejects malformed entries", async () => {
+  removeDataFiles("tasks.json");
+  const agent = await loginAs();
+
+  const payload = {
+    items: [{ id: 1, title: "Water plants", type: "weekday", weekdays: [1, 3] }],
+    completions: {},
+    moves: { "1:2026-08-24": "2026-08-25" },
+  };
+
+  const saved = await agent.put("/api/tasks").send(payload).expect(200);
+  assert.deepEqual(saved.body.moves, payload.moves);
+
+  const reloaded = await agent.get("/api/tasks").expect(200);
+  assert.deepEqual(reloaded.body.moves, payload.moves);
+
+  await agent
+    .put("/api/tasks")
+    .send({ ...payload, moves: { "1:2026-08-24": "not-a-date" } })
+    .expect(400);
+});
