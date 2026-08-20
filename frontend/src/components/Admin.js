@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { apiFetch } from "../lib/api";
+import { HEADING_FONTS, BODY_FONTS, headingFont, bodyFont } from "../lib/fonts";
 
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "NOK", "DKK"];
 const CSV_RESOURCES = ["invoices", "documents", "contacts", "inventory", "recipes", "maintenance", "plants"];
@@ -30,6 +31,22 @@ export default function Admin({ currentUser, settings, applySettings, apiEnabled
   const featureOptions = tools.filter(tool => !["dashboard", "admin"].includes(tool.id));
 
   useEffect(() => { setSettingsForm(settings); }, [settings]);
+
+  // Load whichever faces the form is previewing, so the sample text is real
+  // rather than a fallback. Saving applies them app-wide via applySettings.
+  useEffect(() => {
+    if (tab !== "settings") return;
+    const previews = [headingFont(settingsForm?.headingFont), bodyFont(settingsForm?.bodyFont)];
+    const href = `https://fonts.googleapis.com/css2?${previews.map(f => `family=${f.spec}`).join("&")}&display=swap`;
+    let link = document.getElementById("homehub-font-preview");
+    if (!link) {
+      link = document.createElement("link");
+      link.id = "homehub-font-preview";
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+  }, [tab, settingsForm?.headingFont, settingsForm?.bodyFont]);
 
   useEffect(() => {
     if (!apiEnabled) return;
@@ -264,6 +281,38 @@ export default function Admin({ currentUser, settings, applySettings, apiEnabled
                 value={settingsForm.location || ""}
                 onChange={e => setSettingsForm(f => ({ ...f, location: e.target.value }))}
               />
+            </div>
+            <div>
+              <label style={labelStyle}>Headings</label>
+              <select
+                style={inputStyle}
+                value={settingsForm.headingFont || "instrument-serif"}
+                onChange={e => setSettingsForm(f => ({ ...f, headingFont: e.target.value }))}
+              >
+                {HEADING_FONTS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+              <p style={{
+                margin: "10px 0 0", fontSize: 26, lineHeight: 1.15, color: "var(--g-ink)",
+                fontFamily: headingFont(settingsForm.headingFont).stack,
+              }}>
+                Household headings
+              </p>
+            </div>
+            <div>
+              <label style={labelStyle}>Body text</label>
+              <select
+                style={inputStyle}
+                value={settingsForm.bodyFont || "dm-sans"}
+                onChange={e => setSettingsForm(f => ({ ...f, bodyFont: e.target.value }))}
+              >
+                {BODY_FONTS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+              <p style={{
+                margin: "10px 0 0", fontSize: 14, lineHeight: 1.5, color: "var(--g-muted)",
+                fontFamily: bodyFont(settingsForm.bodyFont).stack,
+              }}>
+                Paragraphs, labels, and every number on the dashboard are set in this face.
+              </p>
             </div>
             <div>
               <label style={labelStyle}>Temperature unit</label>

@@ -305,6 +305,9 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+const HEADING_FONT_IDS = ["instrument-serif", "fraunces", "playfair", "dm-serif", "libre-baskerville", "space-grotesk", "outfit"];
+const BODY_FONT_IDS = ["dm-sans", "inter", "work-sans", "nunito-sans", "source-sans", "karla", "lora"];
+
 const DEFAULT_ENABLED_FEATURES = {
   invoices: true,
   shopping: true,
@@ -317,7 +320,7 @@ const DEFAULT_ENABLED_FEATURES = {
   contacts: true,
   inventory: true,
 };
-const SAMPLE_SETTINGS = { appName: "HomeHub", householdName: "", currency: "EUR", accentColor: "#16a34a", location: "New York", temperatureUnit: "fahrenheit", krogerLocationId: "", enabledFeatures: DEFAULT_ENABLED_FEATURES };
+const SAMPLE_SETTINGS = { appName: "HomeHub", householdName: "", currency: "EUR", accentColor: "#16a34a", location: "New York", temperatureUnit: "fahrenheit", krogerLocationId: "", headingFont: "instrument-serif", bodyFont: "dm-sans", enabledFeatures: DEFAULT_ENABLED_FEATURES };
 
 const normalizeSettings = (settings = {}) => ({
   ...SAMPLE_SETTINGS,
@@ -853,7 +856,7 @@ app.get("/api/settings", (_, res) => res.json(normalizeSettings(safeLoad(SETTING
 app.put("/api/settings", requireAdmin, (req, res, next) => {
   try {
     const current = normalizeSettings(safeLoad(SETTINGS_FILE, SAMPLE_SETTINGS));
-    const { appName, householdName, currency, accentColor, location, temperatureUnit, krogerLocationId, enabledFeatures } = parsePayload(req);
+    const { appName, householdName, currency, accentColor, location, temperatureUnit, krogerLocationId, headingFont, bodyFont, enabledFeatures } = parsePayload(req);
     const updated = {
       ...current,
       ...(appName !== undefined && { appName: String(appName).trim() || current.appName }),
@@ -863,6 +866,8 @@ app.put("/api/settings", requireAdmin, (req, res, next) => {
       ...(location !== undefined && { location: String(location).trim() }),
       ...(temperatureUnit !== undefined && ["fahrenheit", "celsius"].includes(temperatureUnit) && { temperatureUnit }),
       ...(krogerLocationId !== undefined && { krogerLocationId: String(krogerLocationId).trim() }),
+      ...(headingFont !== undefined && HEADING_FONT_IDS.includes(headingFont) && { headingFont }),
+      ...(bodyFont !== undefined && BODY_FONT_IDS.includes(bodyFont) && { bodyFont }),
       ...(enabledFeatures && typeof enabledFeatures === "object" && {
         enabledFeatures: Object.fromEntries(
           Object.keys(DEFAULT_ENABLED_FEATURES).map(key => [key, enabledFeatures[key] !== false])

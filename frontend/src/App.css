@@ -1761,3 +1761,46 @@ li.planner-empty-line {
   color: var(--planner-muted);
   font-size: 14px;
 }
+
+/* ── Cookbook density ────────────────────────────────────────────────────── */
+
+.cookbook-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--g-card);
+  border: 1px solid var(--g-hair);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.cookbook-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 74px 58px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--g-hair2);
+  cursor: pointer;
+  font-family: var(--g-sans);
+}
+
+.cookbook-row:last-child {
+  border-bottom: 0;
+}
+
+.cookbook-row:hover,
+.cookbook-row:focus-visible {
+  background: var(--g-bg);
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  /* Time and servings are the first things worth losing on a phone. */
+  .cookbook-row {
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+  }
+  .cookbook-row > :nth-child(4),
+  .cookbook-row > :nth-child(5) {
+    display: none;
+  }
+}

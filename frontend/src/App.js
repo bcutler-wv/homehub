@@ -8,6 +8,7 @@ import Dashboard from "./components/Dashboard";
 import InvoiceTracker from "./components/InvoiceTracker";
 import MealPlanner from "./components/MealPlanner";
 import TodoTasks from "./components/TodoTasks";
+import { applyFonts } from "./lib/fonts";
 import Maintenance from "./components/Maintenance";
 import CalendarView from "./components/CalendarView";
 import PlantManager from "./components/PlantManager";
@@ -45,6 +46,8 @@ const DEFAULT_SETTINGS = {
   householdName: "",
   currency: "EUR",
   accentColor: "#5a7a5e",
+  headingFont: "instrument-serif",
+  bodyFont: "dm-sans",
   location: "New York",
   temperatureUnit: "fahrenheit",
   enabledFeatures: DEFAULT_ENABLED_FEATURES,
@@ -127,6 +130,7 @@ export default function App() {
     setSettings(normalized);
     document.documentElement.style.setProperty("--accent", normalized.accentColor || "#5a7a5e");
     document.documentElement.style.setProperty("--accent-dark", adjustColor(normalized.accentColor || "#5a7a5e", -20));
+    applyFonts(normalized.headingFont, normalized.bodyFont);
     if (normalized.appName) document.title = normalized.appName;
   }, []);
 

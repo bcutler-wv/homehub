@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: var(--g-sans, 'DM Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Prevent overscroll bounce from revealing the background on iOS */

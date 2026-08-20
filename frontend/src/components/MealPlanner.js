@@ -45,6 +45,14 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
   const [checkedIngredients, setCheckedIngredients] = useState({});
   const [sidebarServings, setSidebarServings] = useState(4);
   const [recipeSearchTerm, setRecipeSearchTerm] = useState("");
+  const [cookbookDensity, setCookbookDensity] = useState(() => {
+    try { return localStorage.getItem("cookbookDensity") === "list" ? "list" : "cards"; } catch { return "cards"; }
+  });
+
+  const chooseDensity = (mode) => {
+    setCookbookDensity(mode);
+    try { localStorage.setItem("cookbookDensity", mode); } catch { /* private mode */ }
+  };
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [deleteRecipeId, setDeleteRecipeId] = useState(null);
   const [shoppingDraft, setShoppingDraft] = useState(null);
@@ -380,6 +388,27 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "var(--g-ink)" }}>
             Cookbook <span style={{ color: "var(--g-muted)", fontWeight: 400 }}>· {recipes.length}</span>
           </h2>
+          <div role="group" aria-label="Recipe view" style={{ display: "flex", gap: 2, padding: 3, borderRadius: 10, background: "var(--g-bg2)" }}>
+            {[
+              { id: "cards", label: "Cards" },
+              { id: "list", label: "List" },
+            ].map(mode => (
+              <button
+                key={mode.id}
+                onClick={() => chooseDensity(mode.id)}
+                aria-pressed={cookbookDensity === mode.id}
+                style={{
+                  border: "none", borderRadius: 8, cursor: "pointer",
+                  padding: "5px 12px", fontSize: 12, fontWeight: 600, fontFamily: "var(--g-sans)",
+                  background: cookbookDensity === mode.id ? "var(--g-card)" : "transparent",
+                  color: cookbookDensity === mode.id ? "var(--g-ink)" : "var(--g-muted)",
+                  boxShadow: cookbookDensity === mode.id ? "var(--g-shadow-sm)" : "none",
+                }}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
           <div style={{ position: "relative", flex: "1 1 200px", maxWidth: 320, minWidth: 0 }}>
             <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--g-muted)", fontSize: 13, pointerEvents: "none" }}>⌕</span>
             <input
@@ -422,7 +451,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
         </div>
 
         {/* Recipe grid */}
-        <div className="cookbook-grid">
+        <div className={cookbookDensity === "list" ? "cookbook-list" : "cookbook-grid"}>
           {filteredRecipes.length === 0 && (
             <div style={{ color: "var(--g-muted)", fontSize: 13, padding: "40px 20px", textAlign: "center", gridColumn: "1 / -1" }}>
               {recipes.length === 0 ? "No recipes yet — add your first one!" : "No matches found"}
@@ -430,6 +459,50 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
           )}
           {filteredRecipes.map(recipe => {
             const catStyle = recipe.category ? getCatStyle(recipe.category) : null;
+            const minutes = recipe.cookTime || recipe.prepTime;
+
+            if (cookbookDensity === "list") {
+              return (
+                <div
+                  key={recipe.id}
+                  onClick={() => setRecipeView(recipe)}
+                  className="cookbook-row"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRecipeView(recipe); } }}
+                >
+                  <button
+                    onClick={e => { e.stopPropagation(); toggleFavourite(recipe); }}
+                    aria-label={recipe.isFavourite ? `Unfavourite ${recipe.name}` : `Favourite ${recipe.name}`}
+                    style={{ all: "unset", cursor: "pointer", fontSize: 14, lineHeight: 1, color: recipe.isFavourite ? "#e05a5a" : "var(--g-mute2)" }}
+                  >
+                    {recipe.isFavourite ? "♥" : "♡"}
+                  </button>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontFamily: "var(--g-serif)", fontSize: 15, color: "var(--g-ink)", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {recipe.name}
+                    </span>
+                    {recipe.description && (
+                      <span style={{ display: "block", marginTop: 2, fontSize: 11.5, color: "var(--g-muted)", fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {recipe.description}
+                      </span>
+                    )}
+                  </span>
+                  {catStyle && recipe.category ? (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: catStyle.bg, color: catStyle.color, whiteSpace: "nowrap" }}>
+                      {recipe.category}
+                    </span>
+                  ) : <span />}
+                  <span style={{ fontSize: 12, color: "var(--g-muted)", whiteSpace: "nowrap", textAlign: "right" }}>
+                    {minutes ? `⏱ ${minutes} min` : ""}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--g-muted)", whiteSpace: "nowrap", textAlign: "right" }}>
+                    {recipe.servings ? `👥 ${recipe.servings}` : ""}
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={recipe.id}

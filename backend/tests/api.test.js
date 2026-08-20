@@ -208,6 +208,32 @@ test("remembering one kroger match preserves the others", async () => {
   assert.deepEqual(Object.keys(replaced.body), ["onion"]);
 });
 
+test("settings accept known font ids and ignore unknown ones", async () => {
+  removeDataFiles("settings.json", "activity.json");
+  const agent = await loginAs();
+
+  const defaults = await agent.get("/api/settings").expect(200);
+  assert.equal(defaults.body.headingFont, "instrument-serif");
+  assert.equal(defaults.body.bodyFont, "dm-sans");
+
+  const saved = await agent.put("/api/settings")
+    .send({ headingFont: "fraunces", bodyFont: "inter" })
+    .expect(200);
+  assert.equal(saved.body.headingFont, "fraunces");
+  assert.equal(saved.body.bodyFont, "inter");
+
+  // An unknown face must not reach the stylesheet as an arbitrary string.
+  const rejected = await agent.put("/api/settings")
+    .send({ headingFont: "comic-sans", bodyFont: "'; body { display:none }" })
+    .expect(200);
+  assert.equal(rejected.body.headingFont, "fraunces");
+  assert.equal(rejected.body.bodyFont, "inter");
+
+  // A body face is not a valid heading face and vice versa.
+  const crossed = await agent.put("/api/settings").send({ headingFont: "inter" }).expect(200);
+  assert.equal(crossed.body.headingFont, "fraunces");
+});
+
 test("kroger status reports configuration and falls back to the deployment store", async () => {
   removeDataFiles("settings.json", "activity.json");
   const agent = await loginAs();
