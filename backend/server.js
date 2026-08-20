@@ -33,6 +33,7 @@ const {
   INVENTORY_FILE,
   ACTIVITY_FILE,
   RECURRING_INVOICES_FILE,
+  KROGER_MATCHES_FILE,
   CORS_ORIGIN,
   SESSION_SECRET,
   COOKIE_SECURE,
@@ -1158,6 +1159,27 @@ app.get("/api/kroger/search", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Remembered ingredient → product choices, so "garlic" resolves to the same SKU
+// next time instead of asking again. Keyed by normalized ingredient text.
+app.get("/api/kroger/matches", (_, res) => res.json(safeLoad(KROGER_MATCHES_FILE, {})));
+
+app.put("/api/kroger/matches", (req, res, next) => {
+  try {
+    const payload = parsePayload(req);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw Object.assign(new Error("matches must be an object"), { status: 400 });
+    }
+    const cleaned = {};
+    for (const [term, product] of Object.entries(payload)) {
+      if (!term.trim() || !product || typeof product !== "object" || !product.productId) continue;
+      cleaned[term.trim().toLowerCase()] = product;
+    }
+    saveFile(KROGER_MATCHES_FILE, cleaned);
+    broadcast("krogerMatches");
+    res.json(cleaned);
+  } catch (err) { next(err); }
+});
+
 app.get("/api/kroger/locations", async (req, res, next) => {
   try {
     res.json({ locations: await kroger.searchLocations({ zipCode: req.query.zip, limit: req.query.limit }) });
@@ -1169,13 +1191,33 @@ app.get("/api/kroger/locations", async (req, res, next) => {
 const SAMPLE_SHOPPING = { stores: [], items: [] };
 const nextShoppingId = (arr) => arr.reduce((m, i) => Math.max(m, i.id || 0), 0) + 1;
 
-app.get("/api/shopping", (_, res) => res.json(safeLoad(SHOPPING_FILE, SAMPLE_SHOPPING)));
+const VENDORS = ["kroger"];
+
+// A store is bound to a vendor integration by an explicit `vendor` field. Stores
+// created before the field existed are tagged by name on read, so an existing
+// "Kroger" list lights up without anyone re-creating it; once the field is set,
+// renaming the store no longer matters.
+const normalizeShopping = (data = {}) => ({
+  ...data,
+  stores: (data.stores || []).map(store => ({
+    ...store,
+    vendor: store.vendor !== undefined
+      ? store.vendor
+      : (/kroger/i.test(store.name || "") ? "kroger" : null),
+  })),
+  items: data.items || [],
+});
+
+app.get("/api/shopping", (_, res) => res.json(normalizeShopping(safeLoad(SHOPPING_FILE, SAMPLE_SHOPPING))));
 
 app.post("/api/shopping/stores", (req, res, next) => {
   try {
     const data = safeLoad(SHOPPING_FILE, SAMPLE_SHOPPING);
     const { id: _id, ...payload } = parsePayload(req);
     if (!payload.name) return res.status(400).json({ error: { code: 400, message: "name required" } });
+    if (payload.vendor !== undefined && payload.vendor !== null && !VENDORS.includes(payload.vendor)) {
+      return res.status(400).json({ error: { code: 400, message: "unsupported vendor" } });
+    }
     const store = { ...payload, id: nextShoppingId(data.stores) };
     data.stores.push(store);
     saveFile(SHOPPING_FILE, data);
@@ -1191,6 +1233,9 @@ app.put("/api/shopping/stores/:id", (req, res, next) => {
     const idx = data.stores.findIndex(s => s.id === id);
     if (idx === -1) return res.status(404).json({ error: { code: 404, message: "Store not found" } });
     const { id: _id, ...payload } = parsePayload(req);
+    if (payload.vendor !== undefined && payload.vendor !== null && !VENDORS.includes(payload.vendor)) {
+      return res.status(400).json({ error: { code: 400, message: "unsupported vendor" } });
+    }
     data.stores[idx] = { ...data.stores[idx], ...payload, id };
     saveFile(SHOPPING_FILE, data);
     broadcast("shopping");

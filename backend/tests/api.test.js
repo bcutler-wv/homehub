@@ -152,6 +152,37 @@ test("settings temperature unit round-trips and ignores unsupported units", asyn
   assert.equal(rejected.body.temperatureUnit, "celsius");
 });
 
+test("shopping stores carry a vendor tag, inferred by name for existing stores", async () => {
+  removeDataFiles("shopping.json", "activity.json");
+  const agent = await loginAs();
+
+  // Pre-existing stores have no vendor field at all.
+  await agent.post("/api/shopping/stores").send({ name: "Kroger" }).expect(200);
+  await agent.post("/api/shopping/stores").send({ name: "Sam's Club" }).expect(200);
+
+  const listed = await agent.get("/api/shopping").expect(200);
+  const byName = Object.fromEntries(listed.body.stores.map(s => [s.name, s]));
+  assert.equal(byName["Kroger"].vendor, "kroger");
+  assert.equal(byName["Sam's Club"].vendor, null);
+
+  // An explicit tag survives a rename that no longer looks like "Kroger".
+  const renamed = await agent
+    .put(`/api/shopping/stores/${byName["Kroger"].id}`)
+    .send({ name: "The Big Store", vendor: "kroger" })
+    .expect(200);
+  assert.equal(renamed.body.vendor, "kroger");
+
+  const after = await agent.get("/api/shopping").expect(200);
+  assert.equal(after.body.stores.find(s => s.name === "The Big Store").vendor, "kroger");
+
+  // Explicitly clearing the tag is honoured rather than re-inferred.
+  await agent.put(`/api/shopping/stores/${byName["Kroger"].id}`).send({ name: "Kroger", vendor: null }).expect(200);
+  const cleared = await agent.get("/api/shopping").expect(200);
+  assert.equal(cleared.body.stores.find(s => s.name === "Kroger").vendor, null);
+
+  await agent.post("/api/shopping/stores").send({ name: "Aldi", vendor: "safeway" }).expect(400);
+});
+
 test("kroger status reports configuration and falls back to the deployment store", async () => {
   removeDataFiles("settings.json", "activity.json");
   const agent = await loginAs();
