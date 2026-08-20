@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext, DragOverlay, PointerSensor, TouchSensor,
+  useSensor, useSensors, useDraggable, useDroppable,
+} from "@dnd-kit/core";
 import { apiFetch } from "../lib/api";
 import { dateKey, useTodayKey } from "../lib/utils";
 import {
   normalizeTasks, completionKey, taskAppearsOnDay,
+  applyThisWeekMove, applyEveryWeekMove, applyOnceMove, pruneStaleMoves,
 } from "../lib/taskSchedule";
 
 const WEEKDAY_OPTIONS = [
@@ -77,6 +82,8 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
   const [selectedDay, setSelectedDay] = useState(null);
   const [taskForm, setTaskForm] = useState(null);
   const [deleteTaskId, setDeleteTaskId] = useState(null);
+  const [movePrompt, setMovePrompt] = useState(null); // { task, fromDay, toDay }
+  const [activeDrag, setActiveDrag] = useState(null); // { task, fromDay }
   const todayKey = useTodayKey();
   const [weekAnchorKey, setWeekAnchorKey] = useState(() => weekStartKey(todayKey));
 
@@ -104,13 +111,14 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
+      if (movePrompt) { setMovePrompt(null); return; }
       if (deleteTaskId) { setDeleteTaskId(null); return; }
       if (taskForm) { setTaskForm(null); return; }
       if (selectedDay) setSelectedDay(null);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [deleteTaskId, selectedDay, taskForm]);
+  }, [deleteTaskId, movePrompt, selectedDay, taskForm]);
 
   const persistTasks = async (next, toastMessage, toastType = "success") => {
     const previous = data;
@@ -205,10 +213,11 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
     const nextCompletions = Object.fromEntries(
       Object.entries(data.completions).filter(([key]) => !key.startsWith(`${deleteTaskId}:`))
     );
-    const next = {
+    const next = pruneStaleMoves({
+      ...data,
       items: data.items.filter(task => task.id !== deleteTaskId),
       completions: nextCompletions,
-    };
+    });
     const deleted = await persistTasks(next, "Task deleted", "danger");
     if (deleted) setDeleteTaskId(null);
   };
@@ -226,6 +235,34 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
   ).slice(0, 3);
   const recurringGoals = activeTasks.filter(task => task.type === "weekday").slice(0, 4);
   const selectedDayTasks = selectedDay ? tasksForDay(selectedDay.key) : [];
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
+
+  const moveTask = async (task, fromDayKey, toDayKey, scope) => {
+    let next;
+    if (task.type === "once") next = applyOnceMove(data, task, toDayKey);
+    else if (scope === "always") next = applyEveryWeekMove(data, task, fromDayKey, toDayKey);
+    else next = applyThisWeekMove(data, task, fromDayKey, toDayKey);
+    await persistTasks(pruneStaleMoves(next), "Task moved");
+  };
+
+  // Recurring tasks need a scope choice (this week vs. every week); one-time tasks just move.
+  const requestMove = (task, fromDayKey, toDayKey) => {
+    if (!toDayKey || toDayKey === fromDayKey) return;
+    if (task.type === "once") { moveTask(task, fromDayKey, toDayKey); return; }
+    setMovePrompt({ task, fromDay: fromDayKey, toDay: toDayKey });
+  };
+
+  const handleDragStart = ({ active }) => setActiveDrag(active.data.current);
+  const handleDragEnd = ({ active, over }) => {
+    setActiveDrag(null);
+    if (!over) return;
+    const { task, fromDay } = active.data.current;
+    requestMove(task, fromDay, String(over.id));
+  };
+
   const navigateWeek = (direction) => {
     setSelectedDay(null);
     setWeekAnchorKey(prev => shiftDays(prev, direction * 7));
@@ -298,6 +335,12 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
           </PlannerPanel>
         </div>
 
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveDrag(null)}
+        >
         <div className="planner-days-grid">
           {weekDays.map((day, idx) => {
             const dayTasks = tasksForDay(day.key);
@@ -316,12 +359,18 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
                   openNewTask(day.key);
                 }}
                 onToggle={toggleComplete}
+                onMove={requestMove}
+                weekDays={weekDays}
               >
                 <span className="planner-day-count">{completed}/{dayTasks.length}</span>
               </DayCard>
             );
           })}
         </div>
+        <DragOverlay>
+          {activeDrag ? <div className="planner-day-task is-dragging">{activeDrag.task.title}</div> : null}
+        </DragOverlay>
+        </DndContext>
       </section>
 
       {selectedDay && (
@@ -472,6 +521,38 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
         </div>
       )}
 
+      {movePrompt && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setMovePrompt(null)}>
+          <div className="modal-box planner-modal planner-move-modal">
+            <p>
+              Move <strong>{movePrompt.task.title}</strong> to{" "}
+              {parseDay(movePrompt.toDay).toLocaleDateString("en-US", { weekday: "long" })}?
+            </p>
+            <div className="planner-modal-footer">
+              <button onClick={() => setMovePrompt(null)} className="planner-secondary-btn">Cancel</button>
+              <button
+                className="planner-secondary-btn"
+                onClick={async () => {
+                  await moveTask(movePrompt.task, movePrompt.fromDay, movePrompt.toDay, "week");
+                  setMovePrompt(null);
+                }}
+              >
+                Just this week
+              </button>
+              <button
+                className="planner-primary-btn"
+                onClick={async () => {
+                  await moveTask(movePrompt.task, movePrompt.fromDay, movePrompt.toDay, "always");
+                  setMovePrompt(null);
+                }}
+              >
+                Every week
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteTaskId && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setDeleteTaskId(null)}>
           <div className="modal-box planner-modal planner-delete-modal">
@@ -496,10 +577,12 @@ function PlannerPanel({ title, className = "", children }) {
   );
 }
 
-function DayCard({ day, tone, tasks, completions, userById, onOpen, onAdd, onToggle, children }) {
+function DayCard({ day, tone, tasks, completions, userById, onOpen, onAdd, onToggle, onMove, weekDays, children }) {
+  const { setNodeRef, isOver } = useDroppable({ id: day.key });
   return (
     <div
-      className={`planner-day-card planner-day-card--${tone}${day.isToday ? " is-today" : ""}`}
+      ref={setNodeRef}
+      className={`planner-day-card planner-day-card--${tone}${day.isToday ? " is-today" : ""}${isOver ? " is-drop-target" : ""}`}
       onClick={onOpen}
       role="button"
       tabIndex={0}
@@ -518,43 +601,117 @@ function DayCard({ day, tone, tasks, completions, userById, onOpen, onAdd, onTog
         {children}
       </div>
       <div className="planner-day-lines">
-        {tasks.slice(0, 6).map(task => {
-          const done = !!completions[completionKey(task.id, day.key)]?.completed;
-          const user = userById.get(String(task.assignedUserId));
-          return (
-            <div key={task.id} className={`planner-day-task${done ? " is-done" : ""}`}>
-              <span
-                role="button"
-                tabIndex={0}
-                className="planner-mini-check"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggle(task, day.key);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onToggle(task, day.key);
-                  }
-                }}
-                aria-label={done ? "Mark incomplete" : "Mark complete"}
-              />
-              <span className="planner-day-task-title">{task.title}</span>
-              {task.sourceId && <span className="planner-chip planner-chip--small">Extra</span>}
-              {user && <Assignee user={user} small />}
-            </div>
-          );
-        })}
-        {Array.from({ length: Math.max(0, 6 - tasks.slice(0, 6).length) }).map((_, idx) => (
+        {tasks.map(task => (
+          <DraggableTaskRow
+            key={task.id}
+            task={task}
+            day={day}
+            done={!!completions[completionKey(task.id, day.key)]?.completed}
+            user={userById.get(String(task.assignedUserId))}
+            onToggle={onToggle}
+            onMove={onMove}
+            weekDays={weekDays}
+          />
+        ))}
+        {Array.from({ length: Math.max(0, 6 - tasks.length) }).map((_, idx) => (
           <EmptyLine key={`line-${idx}`} />
         ))}
       </div>
       <div className="planner-day-footer">
-        {tasks.length > 6 ? <span>+ {tasks.length - 6} more</span> : <span>{day.isToday ? "Today" : ""}</span>}
+        <span>{day.isToday ? "Today" : ""}</span>
         <button onClick={onAdd} className="planner-day-add" title={`Add task for ${day.name}`}>+</button>
       </div>
     </div>
+  );
+}
+
+function DraggableTaskRow({ task, day, done, user, onToggle, onMove, weekDays }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `${task.id}:${day.key}`,
+    data: { task, fromDay: day.key },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`planner-day-task${done ? " is-done" : ""}${isDragging ? " is-drag-source" : ""}`}
+    >
+      <span
+        role="button"
+        tabIndex={0}
+        className="planner-mini-check"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(task, day.key);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggle(task, day.key);
+          }
+        }}
+        aria-label={done ? "Mark incomplete" : "Mark complete"}
+      />
+      <span className="planner-day-task-title">{task.title}</span>
+      {task.sourceId && <span className="planner-chip planner-chip--small">Extra</span>}
+      {user && <Assignee user={user} small />}
+      <MoveMenu task={task} day={day} weekDays={weekDays} onMove={onMove} />
+    </div>
+  );
+}
+
+// Keyboard- and touch-friendly alternative to dragging.
+function MoveMenu({ task, day, weekDays = [], onMove }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocPointerDown = (e) => {
+      if (!ref.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDocPointerDown);
+    return () => document.removeEventListener("pointerdown", onDocPointerDown);
+  }, [open]);
+
+  return (
+    <span className="planner-move-menu" ref={ref} onClick={e => e.stopPropagation()}>
+      <button
+        type="button"
+        className="planner-move-trigger"
+        title={`Move ${task.title} to another day`}
+        aria-label={`Move ${task.title} to another day`}
+        aria-expanded={open}
+        onPointerDown={e => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(o => !o);
+        }}
+      >
+        ...
+      </button>
+      {open && (
+        <span className="planner-move-list" role="menu">
+          {weekDays.filter(d => d.key !== day.key).map(d => (
+            <button
+              key={d.key}
+              type="button"
+              role="menuitem"
+              onPointerDown={e => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                onMove(task, day.key, d.key);
+              }}
+            >
+              {d.short}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }
 

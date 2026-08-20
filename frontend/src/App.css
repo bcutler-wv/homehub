@@ -514,9 +514,14 @@ html, body, #root {
 
 .planner-day-task {
   display: grid;
-  grid-template-columns: 14px 1fr auto;
+  grid-template-columns: 14px minmax(0, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: auto;
   align-items: center;
   gap: 8px;
+  /* Required so a touch-drag is not stolen by the scroll container. */
+  touch-action: none;
+  cursor: grab;
 }
 
 .planner-day-task.is-done .planner-day-task-title {
@@ -1632,4 +1637,92 @@ li.planner-empty-line {
 
 @media (max-width: 400px) {
   .plant-cards-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Task board drag-and-drop ────────────────────────────────────────────── */
+
+.planner-day-lines {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.planner-day-card.is-drop-target {
+  outline: 2px dashed var(--planner-ink);
+  outline-offset: -4px;
+}
+
+.planner-day-task.is-drag-source {
+  opacity: 0.35;
+}
+
+.planner-day-task.is-dragging {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--planner-paper);
+  box-shadow: 0 10px 24px rgba(39, 35, 33, 0.22);
+  transform: rotate(-1.5deg);
+  cursor: grabbing;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--planner-ink);
+}
+
+.planner-move-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.planner-move-trigger {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  line-height: 1;
+  color: var(--planner-muted);
+  cursor: pointer;
+}
+
+.planner-move-trigger:hover,
+.planner-move-trigger[aria-expanded="true"] {
+  color: var(--planner-ink);
+}
+
+.planner-move-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--planner-border);
+  border-radius: 8px;
+  background: var(--planner-paper);
+  box-shadow: 0 8px 20px rgba(39, 35, 33, 0.18);
+}
+
+.planner-move-list button {
+  border: 0;
+  border-radius: 5px;
+  padding: 4px 6px;
+  background: none;
+  color: var(--planner-ink);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.planner-move-list button:hover {
+  background: var(--planner-peach);
+}
+
+.planner-move-modal {
+  max-width: 420px;
+  text-align: center;
+}
+
+.planner-move-modal p {
+  margin: 0;
+  color: var(--planner-muted);
+  font-size: 14px;
 }
