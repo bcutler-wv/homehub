@@ -5,24 +5,30 @@ const ADMIN = {
   password: process.env.SMOKE_ADMIN_PASSWORD || "secret123",
 };
 
-// The weather widget calls open-meteo directly; every test stubs it so the
-// dashboard renders a known reading.
+// The weather widget calls open-meteo directly; every test stubs it. The mock
+// answers with a distinguishable temperature per requested unit, so a test can
+// prove the app forwarded the configured unit rather than merely relabelling
+// the suffix on an unchanged number.
+const MOCK_TEMPS = { fahrenheit: 70, celsius: 21 };
+
 const stubWeather = (page) => page.route(/open-meteo\.com/, async (route) => {
-  const url = route.request().url();
-  if (url.includes("geocoding-api")) {
+  const url = new URL(route.request().url());
+  if (url.hostname.startsWith("geocoding-api")) {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ results: [{ name: "Brussels", country: "Belgium", latitude: 50.85, longitude: 4.35 }] }),
     });
     return;
   }
+  const unit = url.searchParams.get("temperature_unit") === "celsius" ? "celsius" : "fahrenheit";
+  const temp = MOCK_TEMPS[unit];
   await route.fulfill({
     contentType: "application/json",
     body: JSON.stringify({
-      current: { temperature_2m: 21, weathercode: 1 },
+      current: { temperature_2m: temp, weathercode: 1 },
       daily: {
-        temperature_2m_max: [24],
-        temperature_2m_min: [16],
+        temperature_2m_max: [temp + 3],
+        temperature_2m_min: [temp - 5],
         sunrise: ["2026-06-30T05:30"],
         sunset: ["2026-06-30T22:00"],
       },
@@ -119,7 +125,9 @@ test("temperature toggle flips the unit shown on the dashboard", async ({ page }
   await stubWeather(page);
   await login(page);
 
-  await expect(page.getByText(/^21°F$/)).toBeVisible();
+  // Default unit is fahrenheit: showing the mock's fahrenheit value proves the
+  // request carried temperature_unit=fahrenheit.
+  await expect(page.getByText(`${MOCK_TEMPS.fahrenheit}°F`, { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Admin" }).first().click();
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
@@ -129,5 +137,7 @@ test("temperature toggle flips the unit shown on the dashboard", async ({ page }
   await expect(page.getByText("Settings saved")).toBeVisible();
 
   await page.getByRole("button", { name: "Dashboard" }).first().click();
-  await expect(page.getByText(/^21°C$/)).toBeVisible();
+  // The number changing (not just the suffix) proves temperature_unit=celsius
+  // reached the open-meteo request.
+  await expect(page.getByText(`${MOCK_TEMPS.celsius}°C`, { exact: true })).toBeVisible();
 });

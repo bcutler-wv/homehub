@@ -39,11 +39,23 @@ const relocateCompletion = (completions, taskId, fromDayKey, toDayKey) => {
   return next;
 };
 
+// Moves are keyed by the task's ORIGINAL (base-schedule) day. Callers may pass
+// the rendered day (where the task currently appears after a prior move) as
+// fromDayKey; resolve it back to the base day before touching the moves map.
+const resolveBaseDay = (moves, taskId, fromDayKey) => {
+  const prefix = movePrefix(taskId);
+  const entry = Object.entries(moves || {}).find(([key, target]) =>
+    key.startsWith(prefix) && target === fromDayKey
+  );
+  return entry ? moveFromDay(entry[0], taskId) : fromDayKey;
+};
+
 export const applyThisWeekMove = (data, task, fromDayKey, toDayKey) => {
-  const key = moveKeyFor(task.id, fromDayKey);
+  const baseDay = resolveBaseDay(data.moves, task.id, fromDayKey);
+  const key = moveKeyFor(task.id, baseDay);
   const moves = { ...data.moves };
-  const previousTarget = moves[key] || fromDayKey;
-  if (toDayKey === fromDayKey) delete moves[key];
+  const previousTarget = moves[key] || baseDay;
+  if (toDayKey === baseDay) delete moves[key];
   else moves[key] = toDayKey;
   return {
     ...data,
@@ -59,16 +71,17 @@ const weekStartOf = (dayKey) => {
 };
 
 export const applyEveryWeekMove = (data, task, fromDayKey, toDayKey) => {
-  const fromWd = dateWeekday(fromDayKey);
+  const baseDay = resolveBaseDay(data.moves, task.id, fromDayKey);
+  const fromWd = dateWeekday(baseDay);
   const toWd = dateWeekday(toDayKey);
   const weekdays = Array.from(new Set(
     (task.weekdays || []).filter(d => d !== fromWd).concat(toWd)
   )).sort((a, b) => a - b);
-  const week = weekStartOf(fromDayKey);
+  const week = weekStartOf(baseDay);
   const moves = Object.fromEntries(Object.entries(data.moves || {}).filter(([key]) =>
     !(key.startsWith(movePrefix(task.id)) && weekStartOf(moveFromDay(key, task.id)) === week)
   ));
-  const previousTarget = (data.moves || {})[moveKeyFor(task.id, fromDayKey)] || fromDayKey;
+  const previousTarget = (data.moves || {})[moveKeyFor(task.id, baseDay)] || baseDay;
   return {
     ...data,
     items: data.items.map(t => t.id === task.id ? { ...t, weekdays } : t),

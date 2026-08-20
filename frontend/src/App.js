@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
   currency: "EUR",
   accentColor: "#5a7a5e",
   location: "New York",
+  temperatureUnit: "fahrenheit",
   enabledFeatures: DEFAULT_ENABLED_FEATURES,
 };
 

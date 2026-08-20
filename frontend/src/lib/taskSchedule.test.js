@@ -61,3 +61,39 @@ test("stale moves are ignored and pruned", () => {
 test("normalizeTasks defaults moves to empty object", () => {
   expect(normalizeTasks({ items: [] }).moves).toEqual({});
 });
+
+test("re-drag chain from rendered day collapses to one base-keyed move", () => {
+  const WED = "2026-08-26";
+  const first = applyThisWeekMove(data(), grocery, MON, TUE);
+  // Kanban UI passes the rendered column (Tue) as fromDay
+  const second = applyThisWeekMove(first, grocery, TUE, WED);
+  expect(second.moves).toEqual({ [`1:${MON}`]: WED });
+  expect(taskAppearsOnDay(grocery, MON, second.moves)).toBe(false);
+  expect(taskAppearsOnDay(grocery, TUE, second.moves)).toBe(false);
+  expect(taskAppearsOnDay(grocery, WED, second.moves)).toBe(true);
+  // pruning must not revert the user's drag
+  expect(pruneStaleMoves(second).moves).toEqual({ [`1:${MON}`]: WED });
+});
+
+test("re-drag back to base day from rendered day clears the move", () => {
+  const first = applyThisWeekMove(data(), grocery, MON, TUE);
+  const back = applyThisWeekMove(first, grocery, TUE, MON);
+  expect(back.moves).toEqual({});
+});
+
+test("every-week move from rendered day rewrites base weekday and clears moves", () => {
+  const first = applyThisWeekMove(data(), grocery, MON, TUE);
+  const d = applyEveryWeekMove(first, grocery, TUE, THU);
+  expect(d.items.find(t => t.id === 1).weekdays).toEqual([4]);
+  expect(Object.keys(d.moves).filter(k => k.startsWith("1:"))).toEqual([]);
+});
+
+test("completion set on rendered day follows a re-drag", () => {
+  const WED = "2026-08-26";
+  const first = applyThisWeekMove(data(), grocery, MON, TUE);
+  // user completes the task while it sits on Tuesday
+  const withDone = { ...first, completions: { [completionKey(1, TUE)]: { completed: true } } };
+  const second = applyThisWeekMove(withDone, grocery, TUE, WED);
+  expect(second.completions[completionKey(1, TUE)]).toBeUndefined();
+  expect(second.completions[completionKey(1, WED)]?.completed).toBe(true);
+});

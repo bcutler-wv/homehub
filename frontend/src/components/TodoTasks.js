@@ -186,9 +186,9 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
       active: true,
       sourceId: taskForm.sourceId || null,
     };
-    const next = taskForm.id
+    const next = pruneStaleMoves(taskForm.id
       ? { ...data, items: data.items.map(t => t.id === taskForm.id ? payload : t) }
-      : { ...data, items: [...data.items, { ...payload, id: Date.now(), createdAt: new Date().toISOString() }] };
+      : { ...data, items: [...data.items, { ...payload, id: Date.now(), createdAt: new Date().toISOString() }] });
     const saved = await persistTasks(next, taskForm.id ? "Task updated" : "Task added");
     if (saved) setTaskForm(null);
   };
