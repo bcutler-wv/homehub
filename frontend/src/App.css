@@ -40,6 +40,19 @@ body {
 html, body, #root {
   min-height: 100dvh;
   width: 100%;
+  max-width: 100%;
+  /* Without this a single over-wide child lets the whole page pan sideways,
+     which reads as the screen "walking" off centre on a phone. */
+  overflow-x: hidden;
+}
+
+html {
+  /* iOS inflates text on rotation without this. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overscroll-behavior-x: none;
 }
 
 /* ── Layout ──────────────────────────────────────────────────────────────── */
@@ -1910,5 +1923,20 @@ li.planner-empty-line {
   }
   .shopping-row-sub {
     display: none;
+  }
+}
+
+/* ── Mobile input zoom ───────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* iOS zooms the viewport when a focused control is smaller than 16px, and
+     never zooms back out — that is what makes pinch-to-recenter necessary.
+     Controls here carry an inline 13–14px, so beating it needs !important.
+     Note this removes the *reason* to zoom; it deliberately does not disable
+     zooming, which would be worse for anyone who needs it. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }
