@@ -255,4 +255,35 @@ describe("ShoppingList Kroger vendor", () => {
     expect(await screen.findByText("$8.07")).toBeInTheDocument();
     expect(screen.getByText("3 × $2.69")).toBeInTheDocument();
   });
+
+  test("the Kroger list uses dense rows, other stores keep tiles", async () => {
+    const { container, unmount } = await renderKrogerList({
+      stores: [KROGER],
+      items: [{ id: 10, storeId: 1, name: "Kroger® Red Lentils", checked: false, kroger: { aisle: "AISLE 8", price: 2.69 } }],
+    });
+    selectStore("Kroger");
+    await waitFor(() => expect(container.querySelectorAll(".shopping-row")).toHaveLength(1));
+    unmount();
+
+    const plain = renderList({
+      stores: [SAMS],
+      items: [{ id: 20, storeId: 2, name: "Paper towels", checked: false }],
+    });
+    selectStore("Sam's Club");
+    expect(plain.container.querySelector(".shopping-row")).toBeNull();
+  });
+
+  test("removing from a row does not tick the item off first", async () => {
+    const { setShopping, container } = await renderKrogerList({
+      stores: [KROGER],
+      items: [{ id: 10, storeId: 1, name: "Lentils", checked: false, kroger: { aisle: "AISLE 8" } }],
+    });
+    selectStore("Kroger");
+    await waitFor(() => expect(container.querySelector(".shopping-row")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Remove Lentils"));
+
+    const next = setShopping.mock.calls[0][0]({ items: [{ id: 10, name: "Lentils", checked: false }] });
+    expect(next.items).toHaveLength(0);
+  });
 });

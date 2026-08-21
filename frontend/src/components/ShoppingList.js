@@ -469,16 +469,11 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
                         {group.items.length}
                       </span>
                     </div>
-                    <div style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
-                      gap: 12,
-                    }}>
+                    <div className="shopping-rows">
                       {group.items.map(item => (
-                        <ItemCard
+                        <KrogerItemRow
                           key={item.id}
                           item={item}
-                          storeColor={stores.find(s => s.id === item.storeId)?.color}
                           onToggle={toggleItem}
                           onDelete={deleteItem}
                           onQuantityChange={setQuantity}
@@ -528,24 +523,37 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
                   Clear list
                 </button>
               </div>
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
-                gap: 12,
-              }}>
-                {checked.map(item => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    storeName={activeStoreId === "all" ? stores.find(s => s.id === item.storeId)?.name : null}
-                    storeColor={stores.find(s => s.id === item.storeId)?.color}
-                    showAisle={isKrogerStore}
-                    onToggle={toggleItem}
-                    onDelete={deleteItem}
-                    onQuantityChange={setQuantity}
-                  />
-                ))}
-              </div>
+              {isKrogerStore ? (
+                <div className="shopping-rows">
+                  {checked.map(item => (
+                    <KrogerItemRow
+                      key={item.id}
+                      item={item}
+                      onToggle={toggleItem}
+                      onDelete={deleteItem}
+                      onQuantityChange={setQuantity}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
+                  gap: 12,
+                }}>
+                  {checked.map(item => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      storeName={activeStoreId === "all" ? stores.find(s => s.id === item.storeId)?.name : null}
+                      storeColor={stores.find(s => s.id === item.storeId)?.color}
+                      onToggle={toggleItem}
+                      onDelete={deleteItem}
+                      onQuantityChange={setQuantity}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -640,6 +648,62 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function KrogerItemRow({ item, onToggle, onDelete, onQuantityChange }) {
+  const kroger = item.kroger || null;
+  const unit = kroger?.promoPrice ?? kroger?.price ?? null;
+  const qty = Math.max(1, item.quantity || 1);
+
+  return (
+    <div
+      className={`shopping-row${item.checked ? " is-checked" : ""}`}
+      onClick={() => onToggle(item)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item); } }}
+    >
+      <span className={`shopping-row-check${item.checked ? " is-on" : ""}`} aria-hidden="true">
+        {item.checked && (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 13l4 4 10-12" />
+          </svg>
+        )}
+      </span>
+
+      <ProductThumb src={kroger?.image} alt="" size={34} radius={9} />
+
+      <span style={{ minWidth: 0 }}>
+        <span className="shopping-row-name">{item.name}</span>
+        {(kroger?.brand || kroger?.size) && (
+          <span className="shopping-row-sub">{[kroger.brand, kroger.size].filter(Boolean).join(" · ")}</span>
+        )}
+      </span>
+
+      {typeof unit === "number" ? (
+        <span style={{ textAlign: "right", lineHeight: 1.15 }}>
+          <span style={{ display: "block", fontFamily: "var(--g-serif)", fontSize: 15, color: item.checked ? "var(--g-mute2)" : "var(--g-ink)" }}>
+            ${(unit * qty).toFixed(2)}
+          </span>
+          {qty > 1 && (
+            <span style={{ display: "block", fontSize: 10, color: "var(--g-mute2)" }}>{qty} × ${unit.toFixed(2)}</span>
+          )}
+        </span>
+      ) : <span />}
+
+      {item.checked
+        ? <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--g-mute2)" }}>{qty > 1 ? `×${qty}` : ""}</span>
+        : <QtyStepper value={qty} onChange={next => onQuantityChange(item, next)} label={`quantity of ${item.name}`} />}
+
+      <button
+        onClick={e => { e.stopPropagation(); onDelete(item); }}
+        aria-label={`Remove ${item.name}`}
+        className="shopping-row-remove"
+      >
+        ×
+      </button>
     </div>
   );
 }
