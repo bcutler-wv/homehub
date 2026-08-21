@@ -91,6 +91,21 @@ const searchProducts = async ({ term, locationId, limit = 8 }) => {
   return (data.data || []).map(normalizeProduct);
 };
 
+// Product ids are the only input, deliberately: proxying an arbitrary URL
+// would turn this into an open relay into the private network.
+const PRODUCT_ID = /^[0-9]{6,20}$/;
+const IMAGE_SIZES = ["small", "medium", "large", "thumbnail", "xlarge"];
+
+const fetchProductImage = async ({ productId, size = "medium" }) => {
+  if (!PRODUCT_ID.test(String(productId || ""))) throw bad("invalid productId", 400);
+  const variant = IMAGE_SIZES.includes(size) ? size : "medium";
+  const resp = await fetch(`https://www.kroger.com/product/images/${variant}/front/${productId}`);
+  if (!resp.ok) throw bad(`image unavailable (${resp.status})`, 404);
+  const type = resp.headers.get("content-type") || "";
+  if (!type.startsWith("image/")) throw bad("upstream did not return an image", 502);
+  return { buffer: Buffer.from(await resp.arrayBuffer()), contentType: type };
+};
+
 const searchLocations = async ({ zipCode, limit = 5 }) => {
   if (!zipCode || !/^\d{5}$/.test(String(zipCode).trim())) throw bad("zipCode must be 5 digits", 400);
   const data = await authedGet("/locations", {
@@ -104,4 +119,4 @@ const searchLocations = async ({ zipCode, limit = 5 }) => {
   }));
 };
 
-module.exports = { configured, searchProducts, searchLocations, normalizeProduct, _resetToken: () => { cached = null; } };
+module.exports = { configured, searchProducts, searchLocations, fetchProductImage, normalizeProduct, _resetToken: () => { cached = null; } };

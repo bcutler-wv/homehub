@@ -135,3 +135,80 @@ test("auth failure surfaces as a 502-flagged error", async () => {
     });
   });
 });
+
+test("fetchProductImage only accepts a product id, never a URL", async () => {
+  await withFetch(() => jsonResponse({}), async (calls) => {
+    // Anything that could redirect the request elsewhere must be refused
+    // before a request is made — this endpoint must not become an open relay.
+    for (const bad of [
+      "http://169.254.169.254/latest/meta-data",
+      "../../etc/passwd",
+      "0001111089816/../..",
+      "abc",
+      "",
+      null,
+    ]) {
+      await assert.rejects(() => kroger.fetchProductImage({ productId: bad }), /invalid productId/);
+    }
+    assert.equal(calls.length, 0);
+  });
+});
+
+test("fetchProductImage returns the image bytes and content type", async () => {
+  await withFetch(
+    () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (h) => (h.toLowerCase() === "content-type" ? "image/jpeg" : null) },
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    }),
+    async (calls) => {
+      const out = await kroger.fetchProductImage({ productId: "0001111089816" });
+      assert.equal(out.contentType, "image/jpeg");
+      assert.deepEqual([...out.buffer], [1, 2, 3]);
+      assert.match(calls[0].url, /\/product\/images\/medium\/front\/0001111089816$/);
+    }
+  );
+});
+
+test("fetchProductImage clamps an unknown size to medium", async () => {
+  await withFetch(
+    () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => "image/png" },
+      arrayBuffer: async () => new Uint8Array([0]).buffer,
+    }),
+    async (calls) => {
+      await kroger.fetchProductImage({ productId: "1234567", size: "../../evil" });
+      assert.match(calls[0].url, /\/images\/medium\//);
+    }
+  );
+});
+
+test("fetchProductImage refuses a non-image upstream response", async () => {
+  await withFetch(
+    () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => "text/html" },
+      arrayBuffer: async () => new Uint8Array([0]).buffer,
+    }),
+    async () => {
+      // An HTML body here would mean the bot wall answered, not the image host.
+      await assert.rejects(() => kroger.fetchProductImage({ productId: "1234567" }), /did not return an image/);
+    }
+  );
+});
+
+test("fetchProductImage surfaces an upstream miss as a 404", async () => {
+  await withFetch(
+    () => ({ ok: false, status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) }),
+    async () => {
+      await assert.rejects(() => kroger.fetchProductImage({ productId: "1234567" }), (err) => {
+        assert.equal(err.status, 404);
+        return true;
+      });
+    }
+  );
+});

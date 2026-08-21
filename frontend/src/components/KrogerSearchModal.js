@@ -44,10 +44,15 @@ export function AisleChip({ aisle, bay, small = false }) {
   );
 }
 
-/** Product image, falling back to a neutral tile if Kroger will not serve it. */
-export function ProductThumb({ src, alt, size = 44, radius = 12 }) {
+/**
+ * Product image. Prefers our own origin — the backend fetches from Kroger — so
+ * the browser never has to reach a third party. Falls back to the stored
+ * absolute URL, then to a neutral tile.
+ */
+export function ProductThumb({ src, productId, alt, size = 44, radius = 12 }) {
   const [failed, setFailed] = useState(false);
-  if (!src || failed) {
+  const resolved = productId ? `/api/kroger/image/${productId}` : src;
+  if (!resolved || failed) {
     return (
       <div
         aria-hidden="true"
@@ -67,7 +72,7 @@ export function ProductThumb({ src, alt, size = 44, radius = 12 }) {
   }
   return (
     <img
-      src={src}
+      src={resolved}
       alt={alt || ""}
       loading="lazy"
       onError={() => setFailed(true)}
@@ -81,6 +86,8 @@ export function ProductThumb({ src, alt, size = 44, radius = 12 }) {
  * box so the recipe flow can open straight onto an ingredient.
  */
 export default function KrogerSearchModal({ initialTerm = "", title = "Add from Kroger", onPick, onClose, onSkip, skipLabel }) {
+  // `skipLabel` is called with the current term rather than baked at open time,
+  // and onPick/onSkip report it, so editing the search changes what is added.
   const [term, setTerm] = useState(initialTerm);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -178,7 +185,7 @@ export default function KrogerSearchModal({ initialTerm = "", title = "Add from 
             <button
               key={product.productId || product.upc || `result-${index}`}
               type="button"
-              onClick={() => onPick(product)}
+              onClick={() => onPick(product, term.trim())}
               style={{
                 display: "flex", alignItems: "center", gap: 12, width: "100%",
                 padding: "10px 10px", marginBottom: 6,
@@ -186,7 +193,7 @@ export default function KrogerSearchModal({ initialTerm = "", title = "Add from 
                 cursor: "pointer", textAlign: "left", fontFamily: G.sans,
               }}
             >
-              <ProductThumb src={product.image} alt={product.description} />
+              <ProductThumb src={product.image} productId={product.productId} alt={product.description} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: G.ink, lineHeight: 1.3 }}>
                   {product.description}
@@ -231,13 +238,15 @@ export default function KrogerSearchModal({ initialTerm = "", title = "Add from 
           {onSkip && (
             <button
               type="button"
-              onClick={onSkip}
+              onClick={() => onSkip(term.trim())}
+              disabled={!term.trim()}
               style={{
                 padding: "10px 20px", background: "none", color: G.muted, border: `1px solid ${G.hair}`,
-                borderRadius: 12, fontWeight: 600, fontSize: 14, fontFamily: G.sans, cursor: "pointer",
+                borderRadius: 12, fontWeight: 600, fontSize: 14, fontFamily: G.sans,
+                cursor: term.trim() ? "pointer" : "default", opacity: term.trim() ? 1 : 0.5,
               }}
             >
-              {skipLabel || "Add as plain text"}
+              {typeof skipLabel === "function" ? skipLabel(term.trim()) : (skipLabel || "Add as plain text")}
             </button>
           )}
         </div>

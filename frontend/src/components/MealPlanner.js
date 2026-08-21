@@ -855,7 +855,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
                       rows: p.rows.map((r, j) => j === i ? { ...r, include: e.target.checked } : r),
                     }))}
                   />
-                  <ProductThumb src={row.product?.image} alt="" size={36} radius={10} />
+                  <ProductThumb src={row.product?.image} productId={row.product?.productId} alt="" size={36} radius={10} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--g-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {row.product ? row.product.description : row.term}
@@ -914,7 +914,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
               : p));
             setRowSearch(null);
           }}
-          skipLabel="Add as plain text"
+          skipLabel={() => "Add as plain text"}
           onClose={() => setRowSearch(null)}
         />
       )}

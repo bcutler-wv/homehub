@@ -200,29 +200,19 @@ describe("ShoppingList Kroger vendor", () => {
     expect(screen.getByPlaceholderText(/Add to Sam's Club/i)).toBeInTheDocument();
   });
 
-  test("adding with a quantity carries it onto the item", () => {
+  test("the add bar carries no quantity control; items start at one", () => {
     const { setShopping } = renderList({ stores: [SAMS], items: [] });
     selectStore("Sam's Club");
 
-    fireEvent.click(screen.getByLabelText("Increase quantity to add"));
-    fireEvent.click(screen.getByLabelText("Increase quantity to add"));
+    // Quantity is adjusted on the item once it is on the list.
+    expect(screen.queryByLabelText("Increase quantity to add")).not.toBeInTheDocument();
+
     fireEvent.change(screen.getByPlaceholderText(/Add to Sam's Club/i), { target: { value: "paper towels" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     const next = setShopping.mock.calls[0][0]({ stores: [SAMS], items: [] });
-    expect(next.items[0]).toMatchObject({ name: "paper towels", quantity: 3 });
-  });
-
-  test("the add quantity resets after an add", () => {
-    renderList({ stores: [SAMS], items: [] });
-    selectStore("Sam's Club");
-
-    fireEvent.click(screen.getByLabelText("Increase quantity to add"));
-    fireEvent.change(screen.getByPlaceholderText(/Add to Sam's Club/i), { target: { value: "milk" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-
-    const stepper = screen.getByLabelText("Increase quantity to add").parentElement;
-    expect(within(stepper).getByText("1")).toBeInTheDocument();
+    expect(next.items[0]).toMatchObject({ name: "paper towels" });
+    expect(next.items[0].quantity).toBeUndefined();
   });
 
   test("an item stepper adjusts quantity and clamps at one", () => {
@@ -417,5 +407,27 @@ describe("ShoppingList Kroger vendor", () => {
 
       expect(global.fetch.mock.calls.map(c => String(c[0])).some(u => u.includes("/api/kroger/search"))).toBe(false);
     });
+  });
+
+  test("the modal's add-as-text button follows the edited search term", async () => {
+    mockKrogerStatus(true);
+    const { setShopping } = renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    selectStore("Kroger");
+    await screen.findByRole("button", { name: "Find" });
+
+    fireEvent.change(screen.getByPlaceholderText(/Add to Kroger/i), { target: { value: "pickles" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+
+    const search = await screen.findByLabelText("Search Kroger products");
+    expect(screen.getByRole("button", { name: /Add “pickles” as text/ })).toBeInTheDocument();
+
+    // Editing the term inside the modal must move the label and the payload.
+    fireEvent.change(search, { target: { value: "relish" } });
+    expect(screen.getByRole("button", { name: /Add “relish” as text/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Add “relish” as text/ }));
+    const next = setShopping.mock.calls[0][0]({ stores: [KROGER], items: [] });
+    expect(next.items[0].name).toBe("relish");
   });
 });

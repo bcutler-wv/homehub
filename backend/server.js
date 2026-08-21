@@ -1207,6 +1207,22 @@ app.post("/api/kroger/matches", (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Product images are served from our own origin rather than linked directly.
+// A browser then needs no reach to kroger.com at all — no third-party img-src,
+// no exposure to a content blocker, private relay, or service-worker rule
+// deciding a cross-origin image is not worth loading.
+app.get("/api/kroger/image/:productId", async (req, res, next) => {
+  try {
+    const { buffer, contentType } = await kroger.fetchProductImage({
+      productId: req.params.productId,
+      size: req.query.size,
+    });
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "public, max-age=604800, immutable");
+    res.send(buffer);
+  } catch (err) { next(err); }
+});
+
 app.get("/api/kroger/locations", async (req, res, next) => {
   try {
     res.json({ locations: await kroger.searchLocations({ zipCode: req.query.zip, limit: req.query.limit }) });

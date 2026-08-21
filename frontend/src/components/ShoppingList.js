@@ -77,7 +77,6 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   const [krogerSearch, setKrogerSearch] = useState(null); // { term }
   const [krogerReady, setKrogerReady] = useState(false);
   const [addStoreId, setAddStoreId] = useState(null); // target while "All stores" is filtered
-  const [quickQty, setQuickQty] = useState(1);
   const [suggestions, setSuggestions] = useState(null); // null = idle, [] = searched, no hits
   const [suggestBusy, setSuggestBusy] = useState(false);
   const [highlight, setHighlight] = useState(-1);
@@ -208,21 +207,19 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
       return;
     }
     const name = quickAdd.trim();
-    const quantity = quickQty;
-    const newItem = { id: Date.now(), storeId: targetStore.id, name, quantity, checked: false };
+    const newItem = { id: Date.now(), storeId: targetStore.id, name, checked: false };
     setShopping(s => ({ ...s, items: [...s.items, newItem] }));
     setQuickAdd("");
-    setQuickQty(1);
     quickRef.current?.focus();
     if (!apiEnabled) {
-      queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body: { storeId: targetStore.id, name, quantity }, resource: "shopping", tempId: newItem.id });
+      queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body: { storeId: targetStore.id, name }, resource: "shopping", tempId: newItem.id });
       return;
     }
     try {
       const d = await apiFetch("/api/shopping/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId: targetStore.id, name, quantity }),
+        body: JSON.stringify({ storeId: targetStore.id, name }),
       });
       if (d) setShopping(s => ({ ...s, items: s.items.map(i => i.id === newItem.id ? d : i) }));
     } catch {
@@ -244,8 +241,8 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     if (!targetStore) return;
     const term = sourceTerm ?? krogerSearch?.term ?? "";
     const payload = product
-      ? { ...toShoppingItem(product, { storeId: targetStore.id, line: term }), quantity: quickQty }
-      : { storeId: targetStore.id, name: term, kroger: null, quantity: quickQty };
+      ? toShoppingItem(product, { storeId: targetStore.id, line: term })
+      : { storeId: targetStore.id, name: term, kroger: null };
 
     const optimistic = { ...payload, id: Date.now(), checked: false };
     setShopping(s => ({ ...s, items: [...s.items, optimistic] }));
@@ -253,7 +250,6 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     setSuggestions(null);
     setHighlight(-1);
     setQuickAdd("");
-    setQuickQty(1);
     quickRef.current?.focus();
 
     // Stored under the normalized term so lookups from a recipe line resolve.
@@ -489,7 +485,6 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
               aria-autocomplete={addTargetIsKroger ? "list" : undefined}
               autoComplete="off"
             />
-            <QtyStepper value={quickQty} onChange={setQuickQty} size="md" label="quantity to add" />
             {activeStoreId === "all" && stores.length > 0 && (
               <select
                 value={addStoreId ?? ""}
@@ -542,7 +537,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
                     onMouseDown={e => e.preventDefault()} /* keep focus in the input */
                     onClick={() => { dismissSuggestions(); addKrogerItem(product, quickAdd.trim()); }}
                   >
-                    <ProductThumb src={product.image} alt="" size={32} radius={8} />
+                    <ProductThumb src={product.image} productId={product.productId} alt="" size={32} radius={8} />
                     <span style={{ minWidth: 0 }}>
                       <span className="kroger-suggest-name">{product.description}</span>
                       <span className="kroger-suggest-sub">
@@ -692,9 +687,9 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
         <KrogerSearchModal
           initialTerm={krogerSearch.term}
           title={`Add to ${activeStore?.name || "Kroger"}`}
-          onPick={addKrogerItem}
-          onSkip={() => addKrogerItem(null)}
-          skipLabel={`Add “${krogerSearch.term}” as text`}
+          onPick={(product, term) => addKrogerItem(product, term)}
+          onSkip={(term) => addKrogerItem(null, term)}
+          skipLabel={(term) => (term ? `Add “${term}” as text` : "Add as text")}
           onClose={() => setKrogerSearch(null)}
         />
       )}
@@ -788,7 +783,7 @@ function KrogerItemRow({ item, onToggle, onDelete, onQuantityChange }) {
         )}
       </span>
 
-      <ProductThumb src={kroger?.image} alt="" size={34} radius={9} />
+      <ProductThumb src={kroger?.image} productId={kroger?.productId} alt="" size={34} radius={9} />
 
       <span style={{ minWidth: 0 }}>
         <span className="shopping-row-name">{item.name}</span>
@@ -987,7 +982,7 @@ function ItemCard({ item, storeName, storeColor, showAisle = false, onToggle, on
       {/* Product photo when Kroger gave us one, otherwise the drawn icon */}
       {kroger?.image ? (
         <span style={{ opacity: item.checked ? 0.55 : 1 }}>
-          <ProductThumb src={kroger.image} alt="" size={48} radius={14} />
+          <ProductThumb src={kroger.image} productId={kroger.productId} alt="" size={48} radius={14} />
         </span>
       ) : (
         <div style={{
