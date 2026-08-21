@@ -39,7 +39,9 @@ const renderKrogerList = async (shopping) => {
   return utils;
 };
 
-const selectStore = (name) => fireEvent.click(screen.getByRole("button", { name: new RegExp(name) }));
+// Anchored: item stepper labels ("Increase quantity of Kroger® …") would
+// otherwise match a store name appearing inside a product name.
+const selectStore = (name) => fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${name}`) }));
 
 describe("ShoppingList Kroger vendor", () => {
   test("typing on the Kroger list opens product search instead of adding text", async () => {
@@ -184,5 +186,73 @@ describe("ShoppingList Kroger vendor", () => {
     selectStore("Sam's Club");
     expect(screen.queryByLabelText("Add to store")).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Add to Sam's Club/i)).toBeInTheDocument();
+  });
+
+  test("adding with a quantity carries it onto the item", () => {
+    const { setShopping } = renderList({ stores: [SAMS], items: [] });
+    selectStore("Sam's Club");
+
+    fireEvent.click(screen.getByLabelText("Increase quantity to add"));
+    fireEvent.click(screen.getByLabelText("Increase quantity to add"));
+    fireEvent.change(screen.getByPlaceholderText(/Add to Sam's Club/i), { target: { value: "paper towels" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    const next = setShopping.mock.calls[0][0]({ stores: [SAMS], items: [] });
+    expect(next.items[0]).toMatchObject({ name: "paper towels", quantity: 3 });
+  });
+
+  test("the add quantity resets after an add", () => {
+    renderList({ stores: [SAMS], items: [] });
+    selectStore("Sam's Club");
+
+    fireEvent.click(screen.getByLabelText("Increase quantity to add"));
+    fireEvent.change(screen.getByPlaceholderText(/Add to Sam's Club/i), { target: { value: "milk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    const stepper = screen.getByLabelText("Increase quantity to add").parentElement;
+    expect(within(stepper).getByText("1")).toBeInTheDocument();
+  });
+
+  test("an item stepper adjusts quantity and clamps at one", () => {
+    const { setShopping } = renderList({
+      stores: [SAMS],
+      items: [{ id: 20, storeId: 2, name: "Eggs", checked: false, quantity: 1 }],
+    });
+    selectStore("Sam's Club");
+
+    // Cannot go below one; delete is the way to remove an item.
+    expect(screen.getByLabelText("Decrease quantity of Eggs")).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText("Increase quantity of Eggs"));
+    const next = setShopping.mock.calls[0][0]({ items: [{ id: 20, storeId: 2, name: "Eggs", quantity: 1 }] });
+    expect(next.items[0].quantity).toBe(2);
+  });
+
+  test("changing quantity does not toggle the item off the list", () => {
+    const { setShopping } = renderList({
+      stores: [SAMS],
+      items: [{ id: 20, storeId: 2, name: "Eggs", checked: false, quantity: 2 }],
+    });
+    selectStore("Sam's Club");
+
+    fireEvent.click(screen.getByLabelText("Increase quantity of Eggs"));
+    // A toggle would have written `checked`; only quantity may change.
+    const next = setShopping.mock.calls[0][0]({ items: [{ id: 20, storeId: 2, name: "Eggs", checked: false, quantity: 2 }] });
+    expect(next.items[0].checked).toBe(false);
+    expect(next.items[0].quantity).toBe(3);
+  });
+
+  test("a Kroger item shows the line total with the unit price beneath", async () => {
+    await renderKrogerList({
+      stores: [KROGER],
+      items: [{
+        id: 10, storeId: 1, name: "Kroger® Red Lentils", checked: false, quantity: 3,
+        kroger: { brand: "Kroger", size: "16 oz", price: 2.69, aisle: "AISLE 8", bay: "8" },
+      }],
+    });
+
+    selectStore("Kroger");
+    expect(await screen.findByText("$8.07")).toBeInTheDocument();
+    expect(screen.getByText("3 × $2.69")).toBeInTheDocument();
   });
 });

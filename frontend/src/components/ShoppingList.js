@@ -77,6 +77,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   const [krogerSearch, setKrogerSearch] = useState(null); // { term }
   const [krogerReady, setKrogerReady] = useState(false);
   const [addStoreId, setAddStoreId] = useState(null); // target while "All stores" is filtered
+  const [quickQty, setQuickQty] = useState(1);
   const [quickAdd, setQuickAdd] = useState("");
   const [storeModal, setStoreModal] = useState(null);
   const [deleteStoreId, setDeleteStoreId] = useState(null);
@@ -140,19 +141,21 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
       return;
     }
     const name = quickAdd.trim();
-    const newItem = { id: Date.now(), storeId: targetStore.id, name, checked: false };
+    const quantity = quickQty;
+    const newItem = { id: Date.now(), storeId: targetStore.id, name, quantity, checked: false };
     setShopping(s => ({ ...s, items: [...s.items, newItem] }));
     setQuickAdd("");
+    setQuickQty(1);
     quickRef.current?.focus();
     if (!apiEnabled) {
-      queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body: { storeId: targetStore.id, name }, resource: "shopping", tempId: newItem.id });
+      queueMutation?.({ method: "POST", endpoint: "/api/shopping/items", body: { storeId: targetStore.id, name, quantity }, resource: "shopping", tempId: newItem.id });
       return;
     }
     try {
       const d = await apiFetch("/api/shopping/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId: targetStore.id, name }),
+        body: JSON.stringify({ storeId: targetStore.id, name, quantity }),
       });
       if (d) setShopping(s => ({ ...s, items: s.items.map(i => i.id === newItem.id ? d : i) }));
     } catch {
@@ -174,13 +177,14 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     if (!targetStore) return;
     const term = krogerSearch?.term || "";
     const payload = product
-      ? toShoppingItem(product, { storeId: targetStore.id, line: term })
-      : { storeId: targetStore.id, name: term, kroger: null };
+      ? { ...toShoppingItem(product, { storeId: targetStore.id, line: term }), quantity: quickQty }
+      : { storeId: targetStore.id, name: term, kroger: null, quantity: quickQty };
 
     const optimistic = { ...payload, id: Date.now(), checked: false };
     setShopping(s => ({ ...s, items: [...s.items, optimistic] }));
     setKrogerSearch(null);
     setQuickAdd("");
+    setQuickQty(1);
     quickRef.current?.focus();
 
     // Stored under the normalized term so lookups from a recipe line resolve.
@@ -211,6 +215,26 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     } catch (err) {
       setShopping(s => ({ ...s, items: s.items.filter(i => i.id !== optimistic.id) }));
       showToast?.(err.message || "Could not add item", "danger");
+    }
+  };
+
+  const setQuantity = async (item, next) => {
+    const quantity = Math.max(1, Math.min(99, next));
+    if (quantity === (item.quantity || 1)) return;
+    const previous = item;
+    setShopping(s => ({ ...s, items: s.items.map(i => i.id === item.id ? { ...i, quantity } : i) }));
+    if (!apiEnabled) {
+      queueMutation?.({ method: "PUT", endpoint: `/api/shopping/items/${item.id}`, body: { quantity }, resource: "shopping", tempId: item.id });
+      return;
+    }
+    try {
+      await apiFetch(`/api/shopping/items/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity }),
+      });
+    } catch {
+      setShopping(s => ({ ...s, items: s.items.map(i => i.id === item.id ? previous : i) }));
     }
   };
 
@@ -390,6 +414,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
               onKeyDown={e => e.key === "Enter" && addItem()}
               disabled={stores.length === 0}
             />
+            <QtyStepper value={quickQty} onChange={setQuickQty} size="md" label="quantity to add" />
             {activeStoreId === "all" && stores.length > 0 && (
               <select
                 value={addStoreId ?? ""}
@@ -456,6 +481,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
                           storeColor={stores.find(s => s.id === item.storeId)?.color}
                           onToggle={toggleItem}
                           onDelete={deleteItem}
+                          onQuantityChange={setQuantity}
                         />
                       ))}
                     </div>
@@ -476,6 +502,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
                     storeColor={stores.find(s => s.id === item.storeId)?.color}
                     onToggle={toggleItem}
                     onDelete={deleteItem}
+                    onQuantityChange={setQuantity}
                   />
                 ))}
               </div>
@@ -515,6 +542,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
                     showAisle={isKrogerStore}
                     onToggle={toggleItem}
                     onDelete={deleteItem}
+                    onQuantityChange={setQuantity}
                   />
                 ))}
               </div>
@@ -616,6 +644,62 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   );
 }
 
+function QtyStepper({ value, onChange, size = "sm", label }) {
+  const compact = size === "sm";
+  const btn = {
+    all: "unset",
+    cursor: "pointer",
+    width: compact ? 18 : 24,
+    height: compact ? 18 : 24,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 6,
+    color: "var(--g-ink2)",
+    fontSize: compact ? 13 : 15,
+    lineHeight: 1,
+    userSelect: "none",
+  };
+  return (
+    <span
+      onClick={e => e.stopPropagation()}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: compact ? 2 : 6,
+        padding: compact ? "2px 3px" : "3px 5px",
+        borderRadius: 9, background: "var(--g-bg2)", flexShrink: 0,
+        fontFamily: "var(--g-sans)",
+      }}
+    >
+      <button
+        type="button"
+        style={{ ...btn, opacity: value <= 1 ? 0.35 : 1 }}
+        disabled={value <= 1}
+        aria-label={label ? `Decrease ${label}` : "Decrease quantity"}
+        onClick={e => { e.stopPropagation(); onChange(value - 1); }}
+      >
+        −
+      </button>
+      <span
+        aria-live="polite"
+        style={{
+          minWidth: compact ? 14 : 18, textAlign: "center",
+          fontSize: compact ? 12 : 13.5, fontWeight: 700, color: "var(--g-ink)",
+        }}
+      >
+        {value}
+      </span>
+      <button
+        type="button"
+        style={btn}
+        aria-label={label ? `Increase ${label}` : "Increase quantity"}
+        onClick={e => { e.stopPropagation(); onChange(value + 1); }}
+      >
+        +
+      </button>
+    </span>
+  );
+}
+
 function StoreTab({ active, label, color, count, onClick, onEdit }) {
   return (
     <button
@@ -658,11 +742,12 @@ function StoreTab({ active, label, color, count, onClick, onEdit }) {
   );
 }
 
-function ItemCard({ item, storeName, storeColor, showAisle = false, onToggle, onDelete }) {
+function ItemCard({ item, storeName, storeColor, showAisle = false, onToggle, onDelete, onQuantityChange }) {
   const [hover, setHover] = useState(false);
   const iconKey = detectGroceryIcon(item.name);
   const kroger = item.kroger || null;
   const price = kroger?.promoPrice ?? kroger?.price ?? null;
+  const qty = Math.max(1, item.quantity || 1);
 
   return (
     <div
@@ -754,9 +839,17 @@ function ItemCard({ item, storeName, storeColor, showAisle = false, onToggle, on
         {item.name}
       </span>
 
-      {item.quantity && (
-        <span style={{ fontSize: 11, color: "var(--g-mute2)", fontFamily: "var(--g-sans)" }}>
-          {item.quantity}
+      {onQuantityChange && !item.checked && (
+        <QtyStepper
+          value={qty}
+          onChange={next => onQuantityChange(item, next)}
+          label={`quantity of ${item.name}`}
+        />
+      )}
+
+      {item.checked && qty > 1 && (
+        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--g-mute2)", fontFamily: "var(--g-sans)" }}>
+          ×{qty}
         </span>
       )}
 
@@ -767,11 +860,19 @@ function ItemCard({ item, storeName, storeColor, showAisle = false, onToggle, on
       )}
 
       {typeof price === "number" && (
-        <span style={{
-          fontFamily: "var(--g-serif)", fontSize: 17, lineHeight: 1,
-          color: item.checked ? "var(--g-mute2)" : "var(--g-ink)",
-        }}>
-          ${price.toFixed(2)}
+        <span style={{ textAlign: "center", lineHeight: 1.15 }}>
+          <span style={{
+            display: "block",
+            fontFamily: "var(--g-serif)", fontSize: 17, lineHeight: 1,
+            color: item.checked ? "var(--g-mute2)" : "var(--g-ink)",
+          }}>
+            ${(price * qty).toFixed(2)}
+          </span>
+          {qty > 1 && (
+            <span style={{ display: "block", marginTop: 2, fontSize: 10, color: "var(--g-mute2)", fontFamily: "var(--g-sans)" }}>
+              {qty} × ${price.toFixed(2)}
+            </span>
+          )}
         </span>
       )}
 
