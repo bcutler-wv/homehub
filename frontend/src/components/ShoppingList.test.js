@@ -1,14 +1,26 @@
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import ShoppingList from "./ShoppingList";
 
 const KROGER = { id: 1, name: "Kroger", color: "#5a7a5e", vendor: "kroger" };
 const SAMS = { id: 2, name: "Sam's Club", color: "#5d7c95", vendor: null };
 
 // The Kroger flow only engages once /api/kroger/status reports configured.
-const mockKrogerStatus = (configured) => {
-  global.fetch = jest.fn((url) => {
-    if (String(url).includes("/api/kroger/status")) {
+const LENTILS = {
+  productId: "0001111089816", description: "Kroger® Red Lentils", brand: "Kroger",
+  size: "16 oz", price: 2.69, aisle: "AISLE 8", bay: "8", image: null,
+};
+
+const mockKrogerStatus = (configured, products = [LENTILS]) => {
+  global.fetch = jest.fn((url, options) => {
+    const u = String(url);
+    if (u.includes("/api/kroger/status")) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ configured, locationId: "02900788" }) });
+    }
+    if (u.includes("/api/kroger/search")) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ products }) });
+    }
+    if (u.includes("/api/shopping/items")) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...JSON.parse(options.body), id: 99, checked: false }) });
     }
     return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
   });
@@ -285,5 +297,125 @@ describe("ShoppingList Kroger vendor", () => {
 
     const next = setShopping.mock.calls[0][0]({ items: [{ id: 10, name: "Lentils", checked: false }] });
     expect(next.items).toHaveLength(0);
+  });
+
+  describe("type-ahead", () => {
+    beforeEach(() => { jest.useFakeTimers(); });
+    afterEach(() => { jest.runOnlyPendingTimers(); jest.useRealTimers(); });
+
+    const typeInto = async (text) => {
+      fireEvent.change(screen.getByPlaceholderText(/Add to Kroger/i), { target: { value: text } });
+      await act(async () => { jest.advanceTimersByTime(350); });
+    };
+
+    test("searches as you type and offers products without pressing Find", async () => {
+      mockKrogerStatus(true);
+      renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Kroger");
+
+      await typeInto("red lentils");
+
+      expect(screen.getByRole("listbox", { name: "Kroger products" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /Kroger® Red Lentils/ })).toBeInTheDocument();
+    });
+
+    test("waits for a pause rather than firing on every keystroke", async () => {
+      mockKrogerStatus(true);
+      renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Kroger");
+
+      const input = screen.getByPlaceholderText(/Add to Kroger/i);
+      fireEvent.change(input, { target: { value: "re" } });
+      await act(async () => { jest.advanceTimersByTime(100); });
+      fireEvent.change(input, { target: { value: "red" } });
+      await act(async () => { jest.advanceTimersByTime(100); });
+      fireEvent.change(input, { target: { value: "red l" } });
+      await act(async () => { jest.advanceTimersByTime(350); });
+
+      const searches = global.fetch.mock.calls.map(c => String(c[0])).filter(u => u.includes("/api/kroger/search"));
+      expect(searches).toHaveLength(1);
+      expect(searches[0]).toContain("red%20l");
+    });
+
+    test("does not search on a single character", async () => {
+      mockKrogerStatus(true);
+      renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Kroger");
+
+      await typeInto("r");
+
+      expect(global.fetch.mock.calls.map(c => String(c[0])).some(u => u.includes("/api/kroger/search"))).toBe(false);
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    });
+
+    test("picking a suggestion adds it with its product metadata", async () => {
+      mockKrogerStatus(true);
+      const { setShopping } = renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Kroger");
+
+      await typeInto("red lentils");
+      fireEvent.click(screen.getByRole("option", { name: /Kroger® Red Lentils/ }));
+
+      const next = setShopping.mock.calls[0][0]({ stores: [KROGER], items: [] });
+      expect(next.items[0]).toMatchObject({ name: "Kroger® Red Lentils" });
+      expect(next.items[0].kroger.aisle).toBe("AISLE 8");
+    });
+
+    test("arrow keys and Enter pick without the mouse", async () => {
+      mockKrogerStatus(true);
+      const { setShopping } = renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Kroger");
+
+      await typeInto("red lentils");
+      const input = screen.getByPlaceholderText(/Add to Kroger/i);
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      const next = setShopping.mock.calls[0][0]({ stores: [KROGER], items: [] });
+      expect(next.items[0].name).toBe("Kroger® Red Lentils");
+    });
+
+    test("Escape dismisses the list and Enter then falls through to the modal", async () => {
+      mockKrogerStatus(true);
+      renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Kroger");
+
+      await typeInto("red lentils");
+      const input = screen.getByPlaceholderText(/Add to Kroger/i);
+      fireEvent.keyDown(input, { key: "Escape" });
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(await screen.findByLabelText("Search Kroger products")).toBeInTheDocument();
+    });
+
+    test("a no-hit search says so instead of leaving an empty box", async () => {
+      mockKrogerStatus(true, []);
+      renderList({ stores: [KROGER], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Kroger");
+
+      await typeInto("zzzz");
+
+      expect(screen.getByText(/Nothing matched/)).toBeInTheDocument();
+    });
+
+    test("a non-Kroger store never type-aheads", async () => {
+      mockKrogerStatus(true);
+      renderList({ stores: [SAMS], items: [] }, { apiEnabled: true });
+      await act(async () => { await Promise.resolve(); });
+      selectStore("Sam's Club");
+
+      fireEvent.change(screen.getByPlaceholderText(/Add to Sam's Club/i), { target: { value: "paper towels" } });
+      await act(async () => { jest.advanceTimersByTime(350); });
+
+      expect(global.fetch.mock.calls.map(c => String(c[0])).some(u => u.includes("/api/kroger/search"))).toBe(false);
+    });
   });
 });

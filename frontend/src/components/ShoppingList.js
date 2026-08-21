@@ -78,6 +78,10 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
   const [krogerReady, setKrogerReady] = useState(false);
   const [addStoreId, setAddStoreId] = useState(null); // target while "All stores" is filtered
   const [quickQty, setQuickQty] = useState(1);
+  const [suggestions, setSuggestions] = useState(null); // null = idle, [] = searched, no hits
+  const [suggestBusy, setSuggestBusy] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const suggestTicket = useRef(0);
   const [quickAdd, setQuickAdd] = useState("");
   const [storeModal, setStoreModal] = useState(null);
   const [deleteStoreId, setDeleteStoreId] = useState(null);
@@ -133,6 +137,69 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     return () => { cancelled = true; };
   }, [apiEnabled, hasKrogerStore]);
 
+  // Search as the user types on a Kroger list, one request per pause rather
+  // than one per keystroke. Stale replies are discarded so a slow search cannot
+  // overwrite a newer one.
+  useEffect(() => {
+    if (!addTargetIsKroger) { setSuggestions(null); setSuggestBusy(false); return undefined; }
+    const term = quickAdd.trim();
+    if (term.length < 2) { setSuggestions(null); setSuggestBusy(false); return undefined; }
+
+    const ticket = ++suggestTicket.current;
+    setSuggestBusy(true);
+    const timer = setTimeout(async () => {
+      try {
+        const data = await apiFetch(`/api/kroger/search?term=${encodeURIComponent(term)}&limit=6`);
+        if (suggestTicket.current !== ticket) return;
+        setSuggestions(data.products || []);
+        setHighlight(-1);
+      } catch {
+        if (suggestTicket.current !== ticket) return;
+        setSuggestions([]);
+      } finally {
+        if (suggestTicket.current === ticket) setSuggestBusy(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [quickAdd, addTargetIsKroger]);
+
+  const dismissSuggestions = () => {
+    suggestTicket.current += 1;
+    setSuggestions(null);
+    setSuggestBusy(false);
+    setHighlight(-1);
+  };
+
+  const onQuickKeyDown = (e) => {
+    const open = Array.isArray(suggestions) && suggestions.length > 0;
+    if (e.key === "ArrowDown" && open) {
+      e.preventDefault();
+      setHighlight(h => (h + 1) % suggestions.length);
+      return;
+    }
+    if (e.key === "ArrowUp" && open) {
+      e.preventDefault();
+      setHighlight(h => (h <= 0 ? suggestions.length - 1 : h - 1));
+      return;
+    }
+    if (e.key === "Escape" && (open || suggestBusy)) {
+      e.preventDefault();
+      dismissSuggestions();
+      return;
+    }
+    if (e.key === "Enter") {
+      if (open && highlight >= 0) {
+        e.preventDefault();
+        const picked = suggestions[highlight];
+        dismissSuggestions();
+        addKrogerItem(picked, quickAdd.trim());
+        return;
+      }
+      addItem();
+    }
+  };
+
   const addItem = async () => {
     const targetStore = addTargetStore;
     if (!quickAdd.trim() || !targetStore) return;
@@ -172,10 +239,10 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     try { await apiFetch(`/api/shopping/items/${item.id}`, { method: "DELETE" }); } catch {}
   };
 
-  const addKrogerItem = async (product) => {
+  const addKrogerItem = async (product, sourceTerm) => {
     const targetStore = addTargetStore;
     if (!targetStore) return;
-    const term = krogerSearch?.term || "";
+    const term = sourceTerm ?? krogerSearch?.term ?? "";
     const payload = product
       ? { ...toShoppingItem(product, { storeId: targetStore.id, line: term }), quantity: quickQty }
       : { storeId: targetStore.id, name: term, kroger: null, quantity: quickQty };
@@ -183,6 +250,8 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
     const optimistic = { ...payload, id: Date.now(), checked: false };
     setShopping(s => ({ ...s, items: [...s.items, optimistic] }));
     setKrogerSearch(null);
+    setSuggestions(null);
+    setHighlight(-1);
     setQuickAdd("");
     setQuickQty(1);
     quickRef.current?.focus();
@@ -395,6 +464,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
       ) : (
         <>
           {/* Quick-add bar */}
+          <div style={{ position: "relative" }}>
           <div style={{
             display: "flex", gap: 10, alignItems: "center",
             background: G.card, borderRadius: 16, padding: "8px 8px 8px 14px",
@@ -411,8 +481,13 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
               placeholder={addPrompt}
               value={quickAdd}
               onChange={e => setQuickAdd(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addItem()}
+              onKeyDown={onQuickKeyDown}
               disabled={stores.length === 0}
+              role={addTargetIsKroger ? "combobox" : undefined}
+              aria-expanded={addTargetIsKroger ? Boolean(suggestions?.length) : undefined}
+              aria-controls={addTargetIsKroger ? "kroger-suggestions" : undefined}
+              aria-autocomplete={addTargetIsKroger ? "list" : undefined}
+              autoComplete="off"
             />
             <QtyStepper value={quickQty} onChange={setQuickQty} size="md" label="quantity to add" />
             {activeStoreId === "all" && stores.length > 0 && (
@@ -442,6 +517,46 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
             >
               {addTargetIsKroger ? "Find" : "Add"}
             </button>
+          </div>
+
+          {addTargetIsKroger && (suggestBusy || Array.isArray(suggestions)) && quickAdd.trim().length >= 2 && (
+            <div id="kroger-suggestions" role="listbox" aria-label="Kroger products" className="kroger-suggest">
+              {suggestBusy && !suggestions?.length && (
+                <p className="kroger-suggest-note">Searching Kroger…</p>
+              )}
+              {!suggestBusy && suggestions?.length === 0 && (
+                <p className="kroger-suggest-note">
+                  Nothing matched “{quickAdd.trim()}”. Press Add to put it on the list as text.
+                </p>
+              )}
+              {(suggestions || []).map((product, i) => {
+                const unit = product.promoPrice ?? product.price;
+                return (
+                  <button
+                    key={product.productId || product.upc || `s-${i}`}
+                    type="button"
+                    role="option"
+                    aria-selected={i === highlight}
+                    className={`kroger-suggest-row${i === highlight ? " is-active" : ""}`}
+                    onMouseEnter={() => setHighlight(i)}
+                    onMouseDown={e => e.preventDefault()} /* keep focus in the input */
+                    onClick={() => { dismissSuggestions(); addKrogerItem(product, quickAdd.trim()); }}
+                  >
+                    <ProductThumb src={product.image} alt="" size={32} radius={8} />
+                    <span style={{ minWidth: 0 }}>
+                      <span className="kroger-suggest-name">{product.description}</span>
+                      <span className="kroger-suggest-sub">
+                        {[product.brand, product.size, product.aisle].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    <span className="kroger-suggest-price">
+                      {typeof unit === "number" ? `$${unit.toFixed(2)}` : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           </div>
 
           {/* Items */}
