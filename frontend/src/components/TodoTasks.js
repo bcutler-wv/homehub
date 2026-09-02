@@ -7,7 +7,7 @@ import { apiFetch } from "../lib/api";
 import { dateKey, useTodayKey } from "../lib/utils";
 import {
   normalizeTasks, completionKey, taskAppearsOnDay,
-  applyThisWeekMove, applyEveryWeekMove, applyOnceMove, pruneStaleMoves,
+  applyThisWeekMove, applyEveryWeekMove, applyOnceMove, applyDayMove, pruneStaleMoves,
 } from "../lib/taskSchedule";
 
 const WEEKDAY_OPTIONS = [
@@ -255,12 +255,30 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
     setMovePrompt({ task, fromDay: fromDayKey, toDay: toDayKey });
   };
 
+  const moveDay = async (fromDayKey, toDayKey, scope) => {
+    const dayTasks = tasksForDay(fromDayKey);
+    if (!dayTasks.length) return;
+    const next = applyDayMove(data, dayTasks, fromDayKey, toDayKey, scope);
+    await persistTasks(pruneStaleMoves(next), `${dayTasks.length} task${dayTasks.length === 1 ? "" : "s"} moved`);
+  };
+
+  const requestDayMove = (fromDayKey, toDayKey) => {
+    if (!toDayKey || toDayKey === fromDayKey) return;
+    const dayTasks = tasksForDay(fromDayKey);
+    if (!dayTasks.length) { showToast("That day has nothing to move", "danger"); return; }
+    // Only recurring tasks need the scope question; a day of one-offs just moves.
+    if (!dayTasks.some(t => t.type === "weekday")) { moveDay(fromDayKey, toDayKey); return; }
+    setMovePrompt({ kind: "day", fromDay: fromDayKey, toDay: toDayKey, count: dayTasks.length });
+  };
+
   const handleDragStart = ({ active }) => setActiveDrag(active.data.current);
   const handleDragEnd = ({ active, over }) => {
     setActiveDrag(null);
     if (!over) return;
-    const { task, fromDay } = active.data.current;
-    requestMove(task, fromDay, String(over.id));
+    const payload = active.data.current || {};
+    const toDay = String(over.id);
+    if (payload.kind === "day") { requestDayMove(payload.day.key, toDay); return; }
+    requestMove(payload.task, payload.fromDay, toDay);
   };
 
   const navigateWeek = (direction) => {
@@ -368,7 +386,11 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
           })}
         </div>
         <DragOverlay>
-          {activeDrag ? <div className="planner-day-task is-dragging">{activeDrag.task.title}</div> : null}
+          {activeDrag ? (
+            <div className="planner-day-task is-dragging">
+              {activeDrag.kind === "day" ? `${activeDrag.day.name} — whole day` : activeDrag.task.title}
+            </div>
+          ) : null}
         </DragOverlay>
         </DndContext>
       </section>
@@ -525,15 +547,27 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setMovePrompt(null)}>
           <div className="modal-box planner-modal planner-move-modal">
             <p>
-              Move <strong>{movePrompt.task.title}</strong> to{" "}
-              {parseDay(movePrompt.toDay).toLocaleDateString("en-US", { weekday: "long" })}?
+              {movePrompt.kind === "day" ? (
+                <>
+                  Move all <strong>{movePrompt.count}</strong>{" "}
+                  {movePrompt.count === 1 ? "task" : "tasks"} from{" "}
+                  {parseDay(movePrompt.fromDay).toLocaleDateString("en-US", { weekday: "long" })} to{" "}
+                  {parseDay(movePrompt.toDay).toLocaleDateString("en-US", { weekday: "long" })}?
+                </>
+              ) : (
+                <>
+                  Move <strong>{movePrompt.task.title}</strong> to{" "}
+                  {parseDay(movePrompt.toDay).toLocaleDateString("en-US", { weekday: "long" })}?
+                </>
+              )}
             </p>
             <div className="planner-modal-footer">
               <button onClick={() => setMovePrompt(null)} className="planner-secondary-btn">Cancel</button>
               <button
                 className="planner-secondary-btn"
                 onClick={async () => {
-                  await moveTask(movePrompt.task, movePrompt.fromDay, movePrompt.toDay, "week");
+                  if (movePrompt.kind === "day") await moveDay(movePrompt.fromDay, movePrompt.toDay, "week");
+                  else await moveTask(movePrompt.task, movePrompt.fromDay, movePrompt.toDay, "week");
                   setMovePrompt(null);
                 }}
               >
@@ -542,7 +576,8 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
               <button
                 className="planner-primary-btn"
                 onClick={async () => {
-                  await moveTask(movePrompt.task, movePrompt.fromDay, movePrompt.toDay, "always");
+                  if (movePrompt.kind === "day") await moveDay(movePrompt.fromDay, movePrompt.toDay, "always");
+                  else await moveTask(movePrompt.task, movePrompt.fromDay, movePrompt.toDay, "always");
                   setMovePrompt(null);
                 }}
               >
@@ -579,10 +614,17 @@ function PlannerPanel({ title, className = "", children }) {
 
 function DayCard({ day, tone, tasks, completions, userById, onOpen, onAdd, onToggle, onMove, weekDays, children }) {
   const { setNodeRef, isOver } = useDroppable({ id: day.key });
+  // The header is the handle, so dragging a day cannot be confused with
+  // dragging one of the task rows inside it.
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `day:${day.key}`,
+    data: { kind: "day", day },
+    disabled: tasks.length === 0,
+  });
   return (
     <div
       ref={setNodeRef}
-      className={`planner-day-card planner-day-card--${tone}${day.isToday ? " is-today" : ""}${isOver ? " is-drop-target" : ""}`}
+      className={`planner-day-card planner-day-card--${tone}${day.isToday ? " is-today" : ""}${isOver ? " is-drop-target" : ""}${isDragging ? " is-drag-source" : ""}`}
       onClick={onOpen}
       role="button"
       tabIndex={0}
@@ -594,7 +636,13 @@ function DayCard({ day, tone, tasks, completions, userById, onOpen, onAdd, onTog
       }}
     >
       <div className="planner-day-header">
-        <span className="planner-day-heading">
+        <span
+          ref={setDragRef}
+          {...attributes}
+          {...listeners}
+          className={`planner-day-heading${tasks.length ? " is-draggable" : ""}`}
+          title={tasks.length ? `Drag ${day.name} onto another day to move all ${tasks.length} tasks` : undefined}
+        >
           <span className="planner-day-name">{day.name}</span>
           <span className="planner-day-date">{day.dateLabel}</span>
         </span>
@@ -633,8 +681,6 @@ function DraggableTaskRow({ task, day, done, user, onToggle, onMove, weekDays })
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
       className={`planner-day-task${done ? " is-done" : ""}${isDragging ? " is-drag-source" : ""}`}
     >
       <span
@@ -654,7 +700,7 @@ function DraggableTaskRow({ task, day, done, user, onToggle, onMove, weekDays })
         }}
         aria-label={done ? "Mark incomplete" : "Mark complete"}
       />
-      <span className="planner-day-task-title">
+      <span className="planner-day-task-title" {...attributes} {...listeners}>
         <span className="planner-day-task-title-text">{task.title}</span>
         {task.sourceId && <span className="planner-chip planner-chip--small">Extra</span>}
       </span>

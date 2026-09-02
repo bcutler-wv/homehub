@@ -532,12 +532,30 @@ body {
   grid-auto-columns: auto;
   align-items: center;
   gap: 8px;
-  /* Required so a touch-drag is not stolen by the scroll container. */
+}
+
+.planner-day-task-title {
+  /* The title is the drag handle. touch-action must be none on the handle
+     itself so a touch-drag is not stolen by the scrolling column. */
   touch-action: none;
   cursor: grab;
 }
 
-.planner-day-task:active {
+.planner-day-task-title:active {
+  cursor: grabbing;
+}
+
+.planner-mini-check {
+  /* Ticking a task off is a click, not a drag — say so. */
+  cursor: pointer;
+}
+
+.planner-day-heading.is-draggable {
+  touch-action: none;
+  cursor: grab;
+}
+
+.planner-day-heading.is-draggable:active {
   cursor: grabbing;
 }
 

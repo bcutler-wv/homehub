@@ -1,6 +1,6 @@
 import {
   taskAppearsOnDay, applyThisWeekMove, applyEveryWeekMove, applyOnceMove,
-  pruneStaleMoves, completionKey, normalizeTasks,
+  pruneStaleMoves, completionKey, normalizeTasks, applyDayMove,
 } from "./taskSchedule";
 
 const MON = "2026-08-24", TUE = "2026-08-25", THU = "2026-08-27";
@@ -96,4 +96,61 @@ test("completion set on rendered day follows a re-drag", () => {
   const second = applyThisWeekMove(withDone, grocery, TUE, WED);
   expect(second.completions[completionKey(1, TUE)]).toBeUndefined();
   expect(second.completions[completionKey(1, WED)]?.completed).toBe(true);
+});
+
+describe("applyDayMove", () => {
+  const mon = "2026-08-17", tue = "2026-08-18";
+  const weekday = (id, title, weekdays = [1]) => ({ id, title, type: "weekday", weekdays, active: true });
+
+  test("moves a whole day this week without touching the schedule", () => {
+    const data = {
+      items: [weekday(1, "A"), weekday(2, "B")],
+      completions: {},
+      moves: {},
+    };
+    const next = applyDayMove(data, data.items, mon, tue, "week");
+
+    expect(next.moves).toEqual({ [`1:${mon}`]: tue, [`2:${mon}`]: tue });
+    expect(next.items.every(t => t.weekdays.includes(1))).toBe(true);
+  });
+
+  test("every-week rewrites each task's weekdays and clears the week's moves", () => {
+    const data = { items: [weekday(1, "A"), weekday(2, "B")], completions: {}, moves: {} };
+    const next = applyDayMove(data, data.items, mon, tue, "always");
+
+    expect(next.items.map(t => t.weekdays)).toEqual([[2], [2]]);
+    expect(next.moves).toEqual({});
+  });
+
+  test("mixed days move one-time tasks by date and recurring by scope", () => {
+    const once = { id: 3, title: "C", type: "once", date: mon, active: true };
+    const data = { items: [weekday(1, "A"), once], completions: {}, moves: {} };
+    const next = applyDayMove(data, data.items, mon, tue, "week");
+
+    expect(next.items.find(t => t.id === 3).date).toBe(tue);
+    expect(next.moves).toEqual({ [`1:${mon}`]: tue });
+  });
+
+  test("completions follow their task to the new day", () => {
+    const data = {
+      items: [weekday(1, "A")],
+      completions: { [`1:${mon}`]: { completed: true } },
+      moves: {},
+    };
+    const next = applyDayMove(data, data.items, mon, tue, "week");
+
+    expect(next.completions[`1:${tue}`]).toEqual({ completed: true });
+    expect(next.completions[`1:${mon}`]).toBeUndefined();
+  });
+
+  test("a move onto the same day, or with no target, is a no-op", () => {
+    const data = { items: [weekday(1, "A")], completions: {}, moves: {} };
+    expect(applyDayMove(data, data.items, mon, mon, "week")).toBe(data);
+    expect(applyDayMove(data, data.items, mon, "", "week")).toBe(data);
+  });
+
+  test("an empty day changes nothing", () => {
+    const data = { items: [weekday(1, "A")], completions: {}, moves: {} };
+    expect(applyDayMove(data, [], mon, tue, "week")).toBe(data);
+  });
 });

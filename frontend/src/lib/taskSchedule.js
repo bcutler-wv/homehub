@@ -96,6 +96,23 @@ export const applyOnceMove = (data, task, toDayKey) => ({
   completions: relocateCompletion(data.completions, task.id, task.date, toDayKey),
 });
 
+/**
+ * Move every given task from one day to another in a single pass, so a whole
+ * day's schedule can shift at once. Folds each task onto the accumulated
+ * document rather than the original, so later tasks see earlier edits — an
+ * every-week move rewrites `weekdays`, and the next task must build on that.
+ *
+ * `scope` applies only to recurring tasks; one-time tasks always just move.
+ */
+export const applyDayMove = (data, tasks, fromDayKey, toDayKey, scope) => {
+  if (!toDayKey || toDayKey === fromDayKey) return data;
+  return (tasks || []).reduce((acc, task) => {
+    if (task.type === "once") return applyOnceMove(acc, task, toDayKey);
+    if (scope === "always") return applyEveryWeekMove(acc, task, fromDayKey, toDayKey);
+    return applyThisWeekMove(acc, task, fromDayKey, toDayKey);
+  }, data);
+};
+
 export const pruneStaleMoves = (data) => {
   const byId = new Map(data.items.map(t => [String(t.id), t]));
   const moves = Object.fromEntries(Object.entries(data.moves || {}).filter(([key]) => {

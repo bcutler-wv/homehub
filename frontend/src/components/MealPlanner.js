@@ -710,6 +710,14 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
                 <button onClick={() => { setRecipeForm({ ...recipeView }); setRecipeView(null); }} style={iconBtn} title="Edit">
                   <span style={{ fontSize: 14 }}>✎</span>
                 </button>
+                <button
+                  onClick={() => { setDeleteRecipeId(recipeView.id); setRecipeView(null); }}
+                  style={iconBtn}
+                  title="Delete recipe"
+                  aria-label={`Delete ${recipeView.name}`}
+                >
+                  <span style={{ fontSize: 15, color: "var(--g-brick)" }}>🗑</span>
+                </button>
                 <button onClick={() => setRecipeView(null)} style={iconBtn} title="Close">
                   <span style={{ fontSize: 19, lineHeight: 1 }}>×</span>
                 </button>

@@ -322,3 +322,67 @@ describe("kroger draft correctness", () => {
     expect(remembered.body.term).toBe("red lentils");
   });
 });
+
+describe("recipe deletion", () => {
+  const RECIPE = { id: 1, name: "Shakshuka", description: "spiced tomato", ingredients: "Eggs", instructions: "Cook.", image: null };
+
+  const renderWith = (setRecipes = jest.fn(), mealPlan = {}, setMealPlan = jest.fn()) => render(
+    <MealPlanner
+      recipes={[RECIPE]}
+      setRecipes={setRecipes}
+      mealPlan={mealPlan}
+      setMealPlan={setMealPlan}
+      shopping={{ stores: [], items: [] }}
+      setShopping={jest.fn()}
+      apiEnabled={false}
+      queueMutation={jest.fn()}
+      showToast={jest.fn()}
+    />
+  );
+
+  test("a recipe can be deleted from its detail view", async () => {
+    const setRecipes = jest.fn();
+    renderWith(setRecipes);
+
+    fireEvent.click(screen.getByText("Shakshuka"));
+    fireEvent.click(await screen.findByLabelText("Delete Shakshuka"));
+
+    // Destructive, so it confirms first.
+    expect(await screen.findByText(/Delete this recipe/)).toBeInTheDocument();
+    expect(setRecipes).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(setRecipes).toHaveBeenCalled());
+    expect(setRecipes.mock.calls[0][0]([RECIPE])).toEqual([]);
+  });
+
+  test("cancelling keeps the recipe", async () => {
+    const setRecipes = jest.fn();
+    renderWith(setRecipes);
+
+    fireEvent.click(screen.getByText("Shakshuka"));
+    fireEvent.click(await screen.findByLabelText("Delete Shakshuka"));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(setRecipes).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Delete this recipe/)).not.toBeInTheDocument();
+  });
+
+  test("deleting a planned recipe unlinks it from the meal plan", async () => {
+    const days = getWeekDays();
+    const setMealPlan = jest.fn();
+    renderWith(jest.fn(), { [days[0].key]: { title: "Shakshuka", recipeId: 1 } }, setMealPlan);
+
+    fireEvent.click(screen.getAllByText("Shakshuka")[0]);
+    fireEvent.click(await screen.findByLabelText("Delete Shakshuka"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(setMealPlan).toHaveBeenCalled());
+    // setMealPlan takes an updater, so run it against the plan it was given.
+    const plan = { [days[0].key]: { title: "Shakshuka", recipeId: 1 } };
+    const nextPlan = setMealPlan.mock.calls[0][0](plan);
+    expect(nextPlan[days[0].key].recipeId).toBeNull();
+    // The day keeps its meal, it just no longer points at a deleted recipe.
+    expect(nextPlan[days[0].key].title).toBe("Shakshuka");
+  });
+});

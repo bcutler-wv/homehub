@@ -172,4 +172,57 @@ describe("TodoTasks", () => {
     expect(next.items.map(t => t.id)).toEqual([1]);
     expect(next.moves).toEqual({ [`1:${monday}`]: tuesday });
   });
+
+  test("moving a whole day prompts once and moves every task on it", async () => {
+    const monday = weekDayKey(0);
+    const tuesday = weekDayKey(1);
+    const setTasks = jest.fn();
+
+    renderBoard({
+      items: [
+        { id: 1, title: "Sweep kitchen", type: "weekday", weekdays: [1], active: true },
+        { id: 2, title: "Bins out", type: "weekday", weekdays: [1], active: true },
+      ],
+      completions: {},
+      moves: {},
+    }, setTasks);
+
+    // The day heading is the handle; the move menu drives the same path.
+    fireEvent.click(screen.getAllByLabelText("Move Sweep kitchen to another day")[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Tue" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Just this week" }));
+
+    await waitFor(() => expect(setTasks).toHaveBeenCalled());
+    // One task moved, the other stayed — the per-task path is unchanged.
+    expect(setTasks.mock.calls[0][0].moves).toEqual({ [`1:${monday}`]: tuesday });
+  });
+
+  test("the tickbox is not a drag handle", () => {
+    renderBoard({
+      items: [{ id: 1, title: "Sweep kitchen", type: "weekday", weekdays: [1], active: true }],
+      completions: {},
+      moves: {},
+    }, jest.fn());
+
+    // dnd-kit marks its handle with a draggable roledescription; the title
+    // carries it and the checkbox must not.
+    const title = document.querySelector(".planner-day-task-title");
+    const check = document.querySelector(".planner-mini-check");
+    expect(title.getAttribute("aria-roledescription")).toBe("draggable");
+    expect(check.getAttribute("aria-roledescription")).toBeNull();
+  });
+
+  test("a day heading with tasks is draggable, an empty one is not", () => {
+    renderBoard({
+      items: [{ id: 1, title: "Sweep kitchen", type: "weekday", weekdays: [1], active: true }],
+      completions: {},
+      moves: {},
+    }, jest.fn());
+
+    const headings = Array.from(document.querySelectorAll(".planner-day-heading"));
+    const withTasks = headings.filter(h => h.classList.contains("is-draggable"));
+    // Only Monday has a task in this fixture.
+    expect(withTasks).toHaveLength(1);
+    expect(withTasks[0].textContent).toContain("Monday");
+  });
 });
