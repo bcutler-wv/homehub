@@ -22,6 +22,7 @@ module.exports = {
   ACTIVITY_FILE: path.join(DATA_DIR, "activity.json"),
   RECURRING_INVOICES_FILE: path.join(DATA_DIR, "recurringInvoices.json"),
   KROGER_MATCHES_FILE: path.join(DATA_DIR, "krogerMatches.json"),
+  NOTES_FILE: path.join(DATA_DIR, "notes.json"),
   UPLOAD_MAX_MB: parseInt(process.env.UPLOAD_MAX_MB || "10", 10),
   CORS_ORIGIN: process.env.CORS_ORIGIN || null,
   SESSION_SECRET: process.env.SESSION_SECRET || null,

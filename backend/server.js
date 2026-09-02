@@ -34,6 +34,7 @@ const {
   ACTIVITY_FILE,
   RECURRING_INVOICES_FILE,
   KROGER_MATCHES_FILE,
+  NOTES_FILE,
   CORS_ORIGIN,
   SESSION_SECRET,
   COOKIE_SECURE,
@@ -1145,6 +1146,94 @@ app.post("/api/recurring-invoices/:id/generate", (req, res, next) => {
     broadcast("invoices");
     broadcast("recurringInvoices");
     res.json({ invoice, template: templates[idx], skipped: false });
+  } catch (err) { next(err); }
+});
+
+// ── Notes (corkboard) ─────────────────────────────────────────────────────────
+
+const NOTE_COLORS = ["butter", "rose", "sage", "sky", "lilac", "sand"];
+const SAMPLE_NOTES = [];
+
+// Authorship comes from the session, never the payload, so a note cannot be
+// posted in someone else's name.
+const noteAuthor = (req) => {
+  const users = safeLoad(USERS_FILE, []);
+  const u = users.find(x => x.id === req.session?.userId);
+  return { authorId: req.session?.userId || null, authorName: u?.username || req.session?.username || null };
+};
+
+const cleanNote = (payload = {}) => {
+  const out = {};
+  if (payload.title !== undefined) out.title = String(payload.title).slice(0, 200);
+  if (payload.body !== undefined) out.body = String(payload.body).slice(0, 20000);
+  if (payload.color !== undefined && NOTE_COLORS.includes(payload.color)) out.color = payload.color;
+  if (payload.pinned !== undefined) out.pinned = Boolean(payload.pinned);
+  // A link is an id or nothing; an unknown target is simply not linked.
+  if (payload.taskId !== undefined) out.taskId = payload.taskId === null ? null : Number(payload.taskId) || null;
+  if (payload.recipeId !== undefined) out.recipeId = payload.recipeId === null ? null : Number(payload.recipeId) || null;
+  return out;
+};
+
+app.get("/api/notes", (_, res) => res.json(safeLoad(NOTES_FILE, SAMPLE_NOTES)));
+
+app.post("/api/notes", diskUpload.single("image"), (req, res, next) => {
+  try {
+    if (req.file) validateMagicBytes(req.file);
+    const notes = safeLoad(NOTES_FILE, SAMPLE_NOTES);
+    const payload = cleanNote(parsePayload(req));
+    if (!payload.body && !payload.title && !req.file) {
+      return res.status(400).json({ error: { code: 400, message: "A note needs a title, some text, or a photo" } });
+    }
+    const now = new Date().toISOString();
+    const note = {
+      title: "", body: "", color: "butter", pinned: false, taskId: null, recipeId: null,
+      ...payload,
+      image: req.file ? `/uploads/${req.file.filename}` : null,
+      id: nextId(notes),
+      ...noteAuthor(req),
+      createdAt: now,
+      updatedAt: now,
+    };
+    notes.push(note);
+    saveFile(NOTES_FILE, notes);
+    logActivity(req, { resource: "notes", action: "created", label: note.title || "Note" });
+    broadcast("notes");
+    res.json(note);
+  } catch (err) { next(err); }
+});
+
+app.put("/api/notes/:id", diskUpload.single("image"), (req, res, next) => {
+  try {
+    if (req.file) validateMagicBytes(req.file);
+    const notes = safeLoad(NOTES_FILE, SAMPLE_NOTES);
+    const id = parseInt(req.params.id, 10);
+    const idx = notes.findIndex(n => n.id === id);
+    if (idx === -1) return res.status(404).json({ error: { code: 404, message: "Note not found" } });
+    const payload = cleanNote(parsePayload(req));
+    const removeImage = String(parsePayload(req).removeImage) === "true";
+    notes[idx] = {
+      ...notes[idx],
+      ...payload,
+      ...(req.file ? { image: `/uploads/${req.file.filename}` } : removeImage ? { image: null } : {}),
+      id,
+      // Original authorship stands; the edit only moves the timestamp.
+      updatedAt: new Date().toISOString(),
+    };
+    saveFile(NOTES_FILE, notes);
+    broadcast("notes");
+    res.json(notes[idx]);
+  } catch (err) { next(err); }
+});
+
+app.delete("/api/notes/:id", (req, res, next) => {
+  try {
+    const notes = safeLoad(NOTES_FILE, SAMPLE_NOTES);
+    const id = parseInt(req.params.id, 10);
+    const next_ = notes.filter(n => n.id !== id);
+    if (next_.length === notes.length) return res.status(404).json({ error: { code: 404, message: "Note not found" } });
+    saveFile(NOTES_FILE, next_);
+    broadcast("notes");
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

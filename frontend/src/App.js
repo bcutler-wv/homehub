@@ -98,6 +98,7 @@ export default function App() {
   const [activeTool, setActiveTool]         = useState("dashboard");
   const [invoices, setInvoices]             = useState(() => loadLocal("invoices",          SAMPLE_INVOICES));
   const [recipes, setRecipes]               = useState(() => loadLocal("recipes",           SAMPLE_RECIPES));
+  const [notes, setNotes]                   = useState(() => loadLocal("notes",             []));
   const [mealPlan, setMealPlan]             = useState(() => loadLocal("mealPlan",          {}));
   const [tasks, setTasks]                   = useState(() => loadLocal("tasks",             SAMPLE_TASKS));
   const [maintenanceTasks, setMaintenance]  = useState(() => loadLocal("maintenanceTasks",  SAMPLE_MAINTENANCE));
@@ -151,6 +152,7 @@ export default function App() {
   // Persist to localStorage
   useEffect(() => { try { localStorage.setItem("invoices",          JSON.stringify(invoices));         } catch {} }, [invoices]);
   useEffect(() => { try { localStorage.setItem("recipes",           JSON.stringify(recipes));          } catch {} }, [recipes]);
+  useEffect(() => { try { localStorage.setItem("notes",             JSON.stringify(notes));            } catch {} }, [notes]);
   useEffect(() => { try { localStorage.setItem("mealPlan",          JSON.stringify(mealPlan));         } catch {} }, [mealPlan]);
   useEffect(() => { try { localStorage.setItem("tasks",             JSON.stringify(tasks));            } catch {} }, [tasks]);
   useEffect(() => { try { localStorage.setItem("maintenanceTasks",  JSON.stringify(maintenanceTasks)); } catch {} }, [maintenanceTasks]);
@@ -184,14 +186,17 @@ export default function App() {
       apiFetch("/api/settings"),
       apiFetch("/api/users"),
       apiFetch("/api/recurring-invoices"),
+      apiFetch("/api/notes"),
     ]);
 
     const [invoiceData, recipeData, mealData, tasksData, maintenanceData, calendarData, plantData,
-           shoppingData, documentsData, contactsData, inventoryData, settingsData, usersData, recurringData] =
+           shoppingData, documentsData, contactsData, inventoryData, settingsData, usersData, recurringData,
+           notesData] =
       results.map(r => r.status === "fulfilled" ? r.value : null);
 
     if (invoiceData) setInvoices(invoiceData);
     if (recipeData) setRecipes(recipeData);
+    if (notesData) setNotes(notesData);
     if (mealData) setMealPlan(mealData);
     if (tasksData) setTasks(tasksData);
     if (maintenanceData) setMaintenance(maintenanceData);
@@ -310,6 +315,7 @@ export default function App() {
       switch (resource) {
         case "invoices": { const d = await apiFetch("/api/invoices"); if (d) setInvoices(d); break; }
         case "recipes":  { const d = await apiFetch("/api/recipes");  if (d) setRecipes(d);  break; }
+        case "notes":    { const d = await apiFetch("/api/notes");    if (d) setNotes(d);    break; }
         case "mealPlan": { const d = await apiFetch("/api/meal-plan"); if (d) setMealPlan(d); break; }
         case "tasks": { const d = await apiFetch("/api/tasks"); if (d) setTasks(d); break; }
         case "maintenance": { const d = await apiFetch("/api/maintenance"); if (d) setMaintenance(d); break; }
@@ -525,6 +531,8 @@ export default function App() {
                 invoices={invoices} mealPlan={mealPlan} recipes={recipes}
                 maintenanceTasks={maintenanceTasks} calendarEvents={calendarEvents}
                 shopping={shopping} plants={plants} currentUser={currentUser}
+                notes={notes} setNotes={setNotes} tasks={tasks} users={users}
+                apiEnabled={apiEnabled} queueMutation={queueMutation} showToast={showToast}
                 settings={settings}
                 enabledFeatures={enabledFeatures}
                 onNavigate={setActiveTool}

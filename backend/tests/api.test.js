@@ -258,6 +258,58 @@ test("kroger search is unavailable when the API is not configured", async () => 
   assert.match(res.body.error.message, /not configured/);
 });
 
+test("notes carry server-set authorship and timestamps", async () => {
+  removeDataFiles("notes.json", "activity.json");
+  const agent = await loginAs();
+
+  const created = await agent
+    .post("/api/notes")
+    .send({ title: "Vet", body: "Call about **Rosie**", color: "sage", authorName: "Somebody Else" })
+    .expect(200);
+
+  assert.equal(created.body.title, "Vet");
+  assert.equal(created.body.color, "sage");
+  // Authorship comes from the session, so the payload cannot spoof it.
+  assert.equal(created.body.authorName, "admin");
+  assert.ok(created.body.createdAt);
+  assert.equal(created.body.createdAt, created.body.updatedAt);
+  assert.equal(created.body.pinned, false);
+  assert.equal(created.body.image, null);
+
+  const updated = await agent
+    .put(`/api/notes/${created.body.id}`)
+    .send({ pinned: true, body: "Rescheduled" })
+    .expect(200);
+  assert.equal(updated.body.pinned, true);
+  assert.equal(updated.body.body, "Rescheduled");
+  assert.equal(updated.body.authorName, "admin");
+  assert.notEqual(updated.body.updatedAt, updated.body.createdAt);
+  // Editing must not rewrite who wrote it or when it first appeared.
+  assert.equal(updated.body.createdAt, created.body.createdAt);
+
+  const listed = await agent.get("/api/notes").expect(200);
+  assert.equal(listed.body.length, 1);
+
+  await agent.delete(`/api/notes/${created.body.id}`).expect(200);
+  assert.equal((await agent.get("/api/notes").expect(200)).body.length, 0);
+  await agent.delete(`/api/notes/${created.body.id}`).expect(404);
+});
+
+test("notes reject an empty body and an unknown colour", async () => {
+  removeDataFiles("notes.json", "activity.json");
+  const agent = await loginAs();
+
+  await agent.post("/api/notes").send({ title: "", body: "" }).expect(400);
+
+  const odd = await agent.post("/api/notes").send({ body: "x", color: "neon" }).expect(200);
+  assert.equal(odd.body.color, "butter", "an unknown colour falls back to the default");
+
+  // Links are ids or nothing.
+  const linked = await agent.post("/api/notes").send({ body: "y", taskId: "12", recipeId: "nope" }).expect(200);
+  assert.equal(linked.body.taskId, 12);
+  assert.equal(linked.body.recipeId, null);
+});
+
 test("multipart upload rejects files whose magic bytes do not match supported types", async () => {
   removeDataFiles("invoices.json", "activity.json");
   const agent = await loginAs();

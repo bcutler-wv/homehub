@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { fmt, displayStatus, useTodayKey } from "../lib/utils";
+import { fmt, displayStatus } from "../lib/utils";
+import Corkboard from "./Corkboard";
 
 // ─── Weather ──────────────────────────────────────────────────────────────────
 
@@ -205,117 +206,6 @@ function IconWrench() {
 }
 
 // ─── Meal card ────────────────────────────────────────────────────────────────
-
-function MealCard({ todayMeal, recipe, onOpenRecipe }) {
-  return (
-    <div style={{
-      background: "var(--g-card)",
-      border: "1px solid var(--g-hair)",
-      borderRadius: 20,
-      padding: 24,
-      boxShadow: "var(--g-shadow-sm)",
-      marginBottom: 16,
-    }}>
-      <p style={{
-        margin: "0 0 14px",
-        fontSize: 11.5, fontWeight: 600, textTransform: "uppercase",
-        letterSpacing: 0.9, color: "var(--g-sage-dark)", fontFamily: "var(--g-sans)",
-      }}>
-        Tonight at the table
-      </p>
-
-      {todayMeal ? (
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-          <div style={{ flex: 1 }}>
-            <h2 style={{
-              margin: 0, fontSize: 28, fontWeight: 400,
-              fontFamily: "var(--g-serif)", color: "var(--g-ink)", lineHeight: 1.15,
-            }}>
-              {todayMeal.title}
-            </h2>
-            {todayMeal.notes && (
-              <p style={{
-                margin: "6px 0 0", fontSize: 14, fontStyle: "italic",
-                color: "var(--g-muted)", fontFamily: "var(--g-serif)",
-              }}>
-                {todayMeal.notes}
-              </p>
-            )}
-
-            {/* Tags */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14 }}>
-              {recipe?.prepTime && (
-                <span style={tagStyle()}>{recipe.prepTime} min</span>
-              )}
-              {recipe?.servings && (
-                <span style={tagStyle()}>Serves {recipe.servings}</span>
-              )}
-              {!recipe && todayMeal.recipeId == null && null}
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-              <button
-                onClick={onOpenRecipe}
-                style={{
-                  background: "var(--g-sage)", border: "none", color: "#fff",
-                  padding: "9px 18px", borderRadius: 999,
-                  fontSize: 13.5, fontWeight: 600, fontFamily: "var(--g-sans)", cursor: "pointer",
-                }}
-              >
-                Open recipe
-              </button>
-            </div>
-          </div>
-
-          {/* Photo placeholder */}
-          <div style={{
-            width: 96, height: 96, borderRadius: 14, flexShrink: 0,
-            background: "repeating-linear-gradient(45deg, var(--g-hair2) 0px, var(--g-hair2) 6px, var(--g-hair) 6px, var(--g-hair) 12px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            {recipe?.image
-              ? <img src={recipe.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 14 }} />
-              : <span style={{ fontSize: 11, color: "var(--g-mute2)", fontFamily: "var(--g-sans)" }}>recipe<br />photo</span>}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <p style={{ margin: 0, color: "var(--g-muted)", fontSize: 14, fontFamily: "var(--g-sans)" }}>
-            Nothing planned yet.
-          </p>
-          <button
-            onClick={onOpenRecipe}
-            style={{
-              marginTop: 12, background: "var(--g-sage)", border: "none", color: "#fff",
-              padding: "9px 18px", borderRadius: 999,
-              fontSize: 13.5, fontWeight: 600, fontFamily: "var(--g-sans)", cursor: "pointer",
-            }}
-          >
-            Plan dinner
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function tagStyle(variant = "neutral") {
-  const variants = {
-    neutral: { background: "var(--g-bg2)", color: "var(--g-ink2)" },
-    amber:   { background: "var(--g-honey-bg)", color: "var(--g-honey)" },
-    brick:   { background: "var(--g-brick-bg)", color: "var(--g-brick)" },
-    sage:    { background: "var(--g-sage-bg)", color: "var(--g-sage-dark)" },
-  };
-  const v = variants[variant] || variants.neutral;
-  return {
-    ...v,
-    fontSize: 12.5, fontWeight: 600, fontFamily: "var(--g-sans)",
-    padding: "4px 10px", borderRadius: 999,
-  };
-}
-
-// ─── Bills card ───────────────────────────────────────────────────────────────
 
 function BillsCard({ invoices, onNavigate, onTogglePaid }) {
   const openInvoices = useMemo(() => invoices.filter(i => displayStatus(i) !== "paid"), [invoices]);
@@ -644,22 +534,17 @@ export default function Dashboard({
   enabledFeatures = {},
   onNavigate,
   onToggleInvoicePaid, onToggleMaintenanceDone, onWaterPlant,
+  notes = [], setNotes, tasks, users = [], apiEnabled, queueMutation, showToast,
 }) {
   const isFeatureEnabled = (feature) => enabledFeatures[feature] !== false;
   const unit = settings?.temperatureUnit === "celsius" ? "celsius" : "fahrenheit";
   const weather = useWeather(settings?.location, unit);
-  const todayKey = useTodayKey();
 
   const now = useMemo(() => new Date(), []);
   const hour = now.getHours();
   const timeOfDay = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
   const dayName = now.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
 
-  const todayMeal = mealPlan[todayKey];
-  const todayRecipe = useMemo(() => {
-    if (!todayMeal?.recipeId) return null;
-    return recipes.find(r => String(r.id) === String(todayMeal.recipeId)) || null;
-  }, [todayMeal, recipes]);
 
   const firstName = useMemo(() => {
     if (currentUser?.username) {
@@ -734,18 +619,24 @@ export default function Dashboard({
         </div>
       </div>
 
+      <Corkboard
+        notes={notes}
+        setNotes={setNotes}
+        tasks={tasks}
+        recipes={recipes}
+        users={users}
+        currentUser={currentUser}
+        apiEnabled={apiEnabled}
+        queueMutation={queueMutation}
+        showToast={showToast}
+        onNavigate={onNavigate}
+      />
+
       {/* ── Two-column body ─────────────────────────────────────────────────── */}
       <div className="dashboard-main">
 
         {/* Left column */}
         <div>
-          {isFeatureEnabled("meal") && (
-            <MealCard
-              todayMeal={todayMeal}
-              recipe={todayRecipe}
-              onOpenRecipe={() => onNavigate("meal")}
-            />
-          )}
           {isFeatureEnabled("invoices") && (
             <BillsCard
               invoices={invoices}

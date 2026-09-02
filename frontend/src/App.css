@@ -2028,3 +2028,364 @@ li.planner-empty-line {
   font-size: 15px;
   color: var(--g-ink);
 }
+
+/* ── Corkboard ───────────────────────────────────────────────────────────── */
+
+.corkboard-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.corkboard-head h2 {
+  margin: 0;
+  font-family: var(--g-serif);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--g-ink);
+}
+
+.corkboard-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 12px;
+  background: var(--g-sage);
+  color: #fff;
+  font-family: var(--g-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(90, 122, 94, 0.25);
+}
+
+.corkboard-empty {
+  margin: 0;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--g-muted);
+  font-family: var(--g-sans);
+  font-size: 14px;
+}
+
+.corkboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.note {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border: 1px solid;
+  border-radius: 4px 4px 10px 10px;
+  box-shadow: 0 2px 4px rgba(53, 43, 36, 0.08), 0 10px 20px rgba(53, 43, 36, 0.06);
+  cursor: pointer;
+  font-family: var(--g-sans);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.note:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 3px 6px rgba(53, 43, 36, 0.1), 0 14px 26px rgba(53, 43, 36, 0.1);
+}
+
+.note.is-pinned {
+  box-shadow: 0 2px 4px rgba(53, 43, 36, 0.1), 0 12px 24px rgba(53, 43, 36, 0.14);
+}
+
+.note-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: rgba(53, 43, 36, 0.62);
+}
+
+.note-author {
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.note-pin {
+  all: unset;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: 13px;
+  color: rgba(53, 43, 36, 0.35);
+  transform: rotate(-45deg);
+}
+
+.note-pin.is-on {
+  color: var(--g-brick);
+}
+
+.note-title {
+  margin: 0;
+  font-family: var(--g-serif);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--g-ink);
+}
+
+.note-photo {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.note-body {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #3a3129;
+  overflow-wrap: anywhere;
+}
+
+.note-body p { margin: 0 0 6px; }
+.note-body p:last-child { margin-bottom: 0; }
+.note-body ul, .note-body ol { margin: 0 0 6px; padding-left: 18px; }
+.note-body li { margin-bottom: 2px; }
+.note-body a { color: var(--g-sage-dark); }
+
+.note-code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(53, 43, 36, 0.08);
+  font-size: 12px;
+}
+
+.note-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.note-links button {
+  all: unset;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #4a3f36;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-remove {
+  all: unset;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 15px;
+  color: var(--g-brick);
+  cursor: pointer;
+}
+
+.note:hover .note-remove,
+.note-remove:focus-visible {
+  display: flex;
+}
+
+/* Editor */
+
+.note-editor h3 {
+  margin: 0 0 14px;
+  font-family: var(--g-serif);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--g-ink);
+}
+
+.note-input,
+.note-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--g-hair);
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-family: var(--g-sans);
+  font-size: 14px;
+  color: var(--g-ink);
+  background: var(--g-card);
+  outline: none;
+}
+
+.note-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.note-toolbar {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0 6px;
+}
+
+.note-toolbar button {
+  all: unset;
+  cursor: pointer;
+  min-width: 30px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--g-bg2);
+  font-size: 12.5px;
+  color: var(--g-ink2);
+}
+
+.note-toolbar button:hover { background: var(--g-sage-bg); }
+
+.note-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--g-hair);
+  border-radius: 12px;
+  background: var(--g-bg);
+}
+
+.note-preview-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--g-mute2);
+}
+
+.note-editor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.note-colors { display: inline-flex; gap: 6px; }
+
+.note-swatch {
+  all: unset;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid;
+  box-sizing: border-box;
+}
+
+.note-swatch.is-on { outline: 2px solid var(--g-ink); outline-offset: 2px; }
+
+.note-pin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--g-ink2);
+  font-family: var(--g-sans);
+}
+
+.note-pin-toggle input { width: auto; }
+
+.note-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.note-editor-grid label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-muted);
+  font-family: var(--g-sans);
+}
+
+.note-editor-grid select {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 5px;
+  border: 1px solid var(--g-hair);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-family: var(--g-sans);
+  font-size: 13px;
+  background: var(--g-card);
+  color: var(--g-ink);
+}
+
+.note-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.note-photo-row button {
+  all: unset;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--g-bg2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--g-ink2);
+  font-family: var(--g-sans);
+}
+
+.note-photo-name {
+  font-size: 12px;
+  color: var(--g-mute2);
+  font-family: var(--g-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-photo-remove { color: var(--g-brick) !important; background: var(--g-brick-bg) !important; }
+
+@media (max-width: 560px) {
+  .corkboard-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .note-editor-grid { grid-template-columns: 1fr; }
+  /* No hover on touch, so the delete affordance has to stay visible. */
+  .note-remove { display: flex; }
+}
