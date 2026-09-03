@@ -48,6 +48,27 @@ const login = async (page) => {
 const columnFor = (page, dayName) =>
   page.locator(`.planner-day-card:has(.planner-day-name:text-is("${dayName}"))`);
 
+
+// dnd-kit activates on pointer movement past a distance threshold, so a single
+// jump from source to target is not enough — it needs intermediate positions.
+const dragOnto = async (page, source, target) => {
+  const from = await source.boundingBox();
+  const to = await target.boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 24, from.y + from.height / 2, { steps: 6 });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  await page.mouse.up();
+};
+
+const addWeeklyTask = async (page, title) => {
+  await page.getByRole("button", { name: "New task" }).click();
+  await page.getByPlaceholder("e.g. Pack school bags").fill(title);
+  await page.getByRole("button", { name: "Weekly", exact: true }).click();
+  await page.getByRole("button", { name: "Save task" }).click();
+  await expect(page.getByText("Task added")).toBeVisible();
+};
+
 test("login and core household workflows", async ({ page }) => {
   await stubWeather(page);
   await login(page);
@@ -98,7 +119,7 @@ test("moving a recurring task just this week leaves later weeks alone", async ({
 
   await page.getByRole("button", { name: "New task" }).click();
   await page.getByPlaceholder("e.g. Pack school bags").fill("Smoke recurring");
-  await page.getByRole("button", { name: "Weekdays", exact: true }).click();
+  await page.getByRole("button", { name: "Weekly", exact: true }).click();
   await page.getByRole("button", { name: "Save task" }).click();
   await expect(page.getByText("Task added")).toBeVisible();
 
@@ -142,4 +163,49 @@ test("temperature toggle flips the unit shown on the dashboard", async ({ page }
   // The number changing (not just the suffix) proves temperature_unit=celsius
   // reached the open-meteo request.
   await expect(page.getByText(`${MOCK_TEMPS.celsius}°C`, { exact: true })).toBeVisible();
+});
+
+test("dragging a task between days moves it", async ({ page }) => {
+  await stubWeather(page);
+  await login(page);
+  await page.getByRole("button", { name: "Tasks" }).first().click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+
+  await addWeeklyTask(page, "Drag me");
+  await expect(columnFor(page, "Monday")).toContainText("Drag me");
+
+  // The title is the drag handle; the tickbox deliberately is not.
+  const handle = columnFor(page, "Monday").locator(".planner-day-task-title", { hasText: "Drag me" });
+  await dragOnto(page, handle, columnFor(page, "Sunday"));
+
+  await page.getByRole("button", { name: "Just this week" }).click();
+  await expect(page.getByText("Task moved")).toBeVisible();
+
+  await expect(columnFor(page, "Sunday")).toContainText("Drag me");
+  await expect(columnFor(page, "Monday")).not.toContainText("Drag me");
+});
+
+test("dragging a day heading moves every task on that day", async ({ page }) => {
+  await stubWeather(page);
+  await login(page);
+  await page.getByRole("button", { name: "Tasks" }).first().click();
+  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+
+  await addWeeklyTask(page, "First chore");
+  await addWeeklyTask(page, "Second chore");
+  await expect(columnFor(page, "Monday")).toContainText("First chore");
+  await expect(columnFor(page, "Monday")).toContainText("Second chore");
+
+  await dragOnto(
+    page,
+    columnFor(page, "Monday").locator(".planner-day-heading"),
+    columnFor(page, "Saturday")
+  );
+
+  await expect(page.getByText(/Move all 2 tasks/)).toBeVisible();
+  await page.getByRole("button", { name: "Just this week" }).click();
+
+  await expect(columnFor(page, "Saturday")).toContainText("First chore");
+  await expect(columnFor(page, "Saturday")).toContainText("Second chore");
+  await expect(columnFor(page, "Monday")).not.toContainText("chore");
 });

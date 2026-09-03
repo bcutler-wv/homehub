@@ -18,6 +18,12 @@ process.env.ADMIN_USERNAME = process.env.SMOKE_ADMIN_USERNAME || "admin";
 process.env.ADMIN_PASSWORD = process.env.SMOKE_ADMIN_PASSWORD || "secret123";
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || "smoke-session-secret";
 process.env.COOKIE_SECURE = "false";
+// Every scenario logs in, and a repeated run blows straight through the
+// production ceilings (200 req/min, 10 logins per 15min). Without this a later
+// run silently gets 429 on login and then fails on whatever first needs data,
+// which looks like flaky app behaviour rather than a throttled harness.
+process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX || "100000";
+process.env.LOGIN_RATE_LIMIT_MAX = process.env.LOGIN_RATE_LIMIT_MAX || "1000";
 
 const express = require("../../backend/node_modules/express");
 const { app } = require("../../backend/server");

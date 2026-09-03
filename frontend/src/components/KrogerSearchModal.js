@@ -94,6 +94,11 @@ export default function KrogerSearchModal({ initialTerm = "", title = "Add from 
   const [error, setError] = useState(null);
   const inputRef = useRef(null);
   const requestRef = useRef(0);
+  // A search can outlive the modal — picking a product closes it while the
+  // request is still open. Updating state after that warns in React and, in
+  // tests, leaks an update into whatever runs next.
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
   const search = useCallback(async (value) => {
     const query = String(value || "").trim();
@@ -103,14 +108,14 @@ export default function KrogerSearchModal({ initialTerm = "", title = "Add from 
     setError(null);
     try {
       const data = await apiFetch(`/api/kroger/search?term=${encodeURIComponent(query)}&limit=8`);
-      if (ticket !== requestRef.current) return; // a newer search already landed
+      if (!mounted.current || ticket !== requestRef.current) return; // a newer search already landed
       setResults(data.products || []);
     } catch (err) {
-      if (ticket !== requestRef.current) return;
+      if (!mounted.current || ticket !== requestRef.current) return;
       setError(err.message || "Could not reach Kroger");
       setResults([]);
     } finally {
-      if (ticket === requestRef.current) setLoading(false);
+      if (mounted.current && ticket === requestRef.current) setLoading(false);
     }
   }, []);
 

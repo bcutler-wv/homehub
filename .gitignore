@@ -24,3 +24,7 @@ coverage/
 
 # personal documents — never commit
 house-manager-*.pdf
+
+# Playwright output when run from the repo root
+/test-results
+/playwright-report
