@@ -49,7 +49,7 @@ const labelStyle = {
 const btnPrimary = {
   padding: "10px 20px",
   background: G.sage,
-  color: "#fff",
+  color: "var(--g-on-accent)",
   border: "none",
   borderRadius: 12,
   fontWeight: 600,
@@ -412,7 +412,7 @@ export default function ShoppingList({ shopping, setShopping, apiEnabled, queueM
             onClick={() => setStoreModal({ name: "", color: "#5a7a5e" })}
             style={{ ...btnPrimary, display: "flex", alignItems: "center", gap: 8, padding: "10px 16px" }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--g-on-accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14M5 12h14"/>
             </svg>
             Add store
@@ -777,7 +777,7 @@ function KrogerItemRow({ item, onToggle, onDelete, onQuantityChange }) {
     >
       <span className={`shopping-row-check${item.checked ? " is-on" : ""}`} aria-hidden="true">
         {item.checked && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--g-on-accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 13l4 4 10-12" />
           </svg>
         )}
@@ -892,7 +892,7 @@ function StoreTab({ active, label, color, count, onClick, onEdit }) {
         fontWeight: 600,
         fontSize: 13,
         background: active ? (color || "var(--g-sage)") : "var(--g-card)",
-        color: active ? "#fff" : "var(--g-ink2)",
+        color: active ? (color ? "#fff" : "var(--g-on-accent)") : "var(--g-ink2)",
         boxShadow: active ? "0 2px 8px rgba(0,0,0,0.12)" : "var(--g-shadow-sm)",
         border: `1px solid ${active ? "transparent" : "var(--g-hair)"}`,
         transition: "all 0.15s",
@@ -906,7 +906,7 @@ function StoreTab({ active, label, color, count, onClick, onEdit }) {
         <span style={{
           fontWeight: 700, fontSize: 11,
           background: active ? "rgba(255,255,255,0.25)" : "var(--g-sage-bg)",
-          color: active ? "#fff" : "var(--g-sage-dark)",
+          color: active ? (color ? "#fff" : "var(--g-on-accent)") : "var(--g-sage-dark)",
           padding: "1px 6px", borderRadius: 999,
         }}>
           {count}
@@ -955,7 +955,7 @@ function ItemCard({ item, storeName, storeColor, showAisle = false, onToggle, on
           background: "var(--g-sage)",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--g-on-accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 13l4 4 10-12"/>
           </svg>
         </div>

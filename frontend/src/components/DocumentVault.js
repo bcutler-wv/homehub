@@ -16,8 +16,8 @@ const CAT_ICONS = {
 const DEFAULT_CAT_COLOR = "#6b7c73";
 
 const labelStyle = { fontSize: 12, color: "var(--g-muted)", display: "block", marginBottom: 6, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" };
-const inputStyle = { width: "100%", background: "#fff", border: "1px solid var(--g-hair)", borderRadius: 12, padding: "11px 14px", fontSize: 14, fontFamily: "inherit", color: "var(--g-ink)", boxSizing: "border-box" };
-const btnPrimary = { padding: "10px 20px", background: "var(--g-sage)", color: "#fff", border: "none", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" };
+const inputStyle = { width: "100%", background: "var(--g-card)", border: "1px solid var(--g-hair)", borderRadius: 12, padding: "11px 14px", fontSize: 14, fontFamily: "inherit", color: "var(--g-ink)", boxSizing: "border-box" };
+const btnPrimary = { padding: "10px 20px", background: "var(--g-sage)", color: "var(--g-on-accent)", border: "none", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" };
 const btnSecondary = { padding: "10px 20px", background: "var(--g-bg)", color: "var(--g-ink2)", border: "1px solid var(--g-hair)", borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" };
 
 const getDaysUntil = (dateStr) => {
@@ -254,21 +254,21 @@ export default function DocumentVault({ documents, setDocuments, apiEnabled, sho
                 </div>
                 <button onClick={() => setSelectedDoc(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--g-mute2)", fontSize: 18, lineHeight: 1, flexShrink: 0, padding: "2px 4px" }}>×</button>
               </div>
-              <div style={{ flex: 1, overflow: "hidden", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
+              <div style={{ flex: 1, overflow: "hidden", background: "var(--g-viewer)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
                 {selectedDoc.file ? (
                   isImage(selectedDoc.originalName) ? (
                     <img src={`/uploads/${selectedDoc.file}`} alt={selectedDoc.title} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                   ) : isPdf(selectedDoc.originalName) ? (
                     <iframe src={`/uploads/${selectedDoc.file}`} title={selectedDoc.title} style={{ width: "100%", height: "100%", border: "none", minHeight: 380 }} />
                   ) : (
-                    <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", padding: 32 }}>
+                    <div style={{ textAlign: "center", color: "var(--g-on-viewer-dim)", padding: 32 }}>
                       <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
                       <div style={{ fontSize: 14 }}>Preview not available</div>
-                      <a href={`/uploads/${selectedDoc.file}`} download={selectedDoc.originalName || selectedDoc.file} style={{ display: "inline-block", marginTop: 14, padding: "8px 18px", background: "var(--g-sage)", borderRadius: 10, textDecoration: "none", fontSize: 13, fontWeight: 600, color: "#fff" }}>Download</a>
+                      <a href={`/uploads/${selectedDoc.file}`} download={selectedDoc.originalName || selectedDoc.file} style={{ display: "inline-block", marginTop: 14, padding: "8px 18px", background: "var(--g-sage)", borderRadius: 10, textDecoration: "none", fontSize: 13, fontWeight: 600, color: "var(--g-on-accent)" }}>Download</a>
                     </div>
                   )
                 ) : (
-                  <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", padding: 32 }}>
+                  <div style={{ textAlign: "center", color: "var(--g-on-viewer-dim)", padding: 32 }}>
                     <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
                     <div style={{ fontSize: 14 }}>No file attached</div>
                   </div>

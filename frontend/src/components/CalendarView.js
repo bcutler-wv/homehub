@@ -115,7 +115,7 @@ function MonthGrid({ year, month, events, providers, selectedDay, onDayClick, to
                 fontFamily: "var(--g-serif)",
                 fontWeight: 400,
                 color: isSel
-                  ? "#fff"
+                  ? "var(--g-on-accent)"
                   : isToday
                   ? "var(--g-sage-dark)"
                   : isWeekend
@@ -131,7 +131,7 @@ function MonthGrid({ year, month, events, providers, selectedDay, onDayClick, to
                       width: 5,
                       height: 5,
                       borderRadius: "50%",
-                      background: isSel ? "rgba(255,255,255,0.75)" : providerColor(providers, ev.calendarId),
+                      background: isSel ? "var(--g-on-accent-soft)" : providerColor(providers, ev.calendarId),
                       flexShrink: 0,
                     }} />
                   ))}
@@ -139,7 +139,7 @@ function MonthGrid({ year, month, events, providers, selectedDay, onDayClick, to
                     <span style={{
                       fontSize: 10,
                       fontFamily: "var(--g-sans)",
-                      color: isSel ? "rgba(255,255,255,0.75)" : "var(--g-mute2)",
+                      color: isSel ? "var(--g-on-accent-soft)" : "var(--g-mute2)",
                     }}>+{evs.length - 3}</span>
                   )}
                 </div>
@@ -588,7 +588,7 @@ export default function CalendarView({
                     border: "none",
                     borderRadius: 10,
                     padding: "11px",
-                    color: "#fff",
+                    color: "var(--g-on-accent)",
                     fontFamily: "var(--g-sans)",
                     fontWeight: 600,
                     cursor: importing ? "not-allowed" : "pointer",

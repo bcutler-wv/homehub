@@ -570,7 +570,7 @@ export default function InvoiceTracker({ invoices, setInvoices, recurringInvoice
                   style={{
                     background: isOverdue ? "var(--g-sage)" : "var(--g-sage-bg)",
                     border: "none",
-                    color: isOverdue ? "#fff" : "var(--g-sage-dark)",
+                    color: isOverdue ? "var(--g-on-accent)" : "var(--g-sage-dark)",
                     borderRadius: 10, padding: "7px 14px", cursor: "pointer",
                     fontSize: 13, fontWeight: 600, fontFamily: "var(--g-sans)",
                   }}
@@ -759,7 +759,7 @@ export default function InvoiceTracker({ invoices, setInvoices, recurringInvoice
                   <div style={{ padding: "10px 16px", background: "rgba(31,42,36,0.55)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                     <span style={{ flex: 1, fontSize: 12, color: "var(--g-mute2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--g-sans)" }}>📎 {form.file.name}</span>
                     <input ref={fileRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={onFileInput} style={{ display: "none" }} />
-                    <button onClick={() => fileRef.current.click()} style={{ fontSize: 12, color: "var(--g-sage-bg)", background: "none", border: "none", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", fontFamily: "var(--g-sans)" }}>
+                    <button onClick={() => fileRef.current.click()} style={{ fontSize: 12, color: "var(--g-on-viewer)", background: "none", border: "none", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap", fontFamily: "var(--g-sans)" }}>
                       Change file
                     </button>
                   </div>
@@ -800,7 +800,7 @@ export default function InvoiceTracker({ invoices, setInvoices, recurringInvoice
                             fontFamily: "var(--g-sans)",
                           } : {
                             padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
-                            background: "var(--g-sage)", border: "none", color: "#fff",
+                            background: "var(--g-sage)", border: "none", color: "var(--g-on-accent)",
                             fontFamily: "var(--g-sans)",
                           }}>
                             {filled ? "✓" : "→"} {label}
@@ -999,7 +999,7 @@ const cancelBtnStyle = {
 };
 const primaryBtnStyle = {
   flex: 2, padding: "12px", background: "var(--g-sage)", border: "none",
-  borderRadius: 10, color: "#fff", fontWeight: 700, cursor: "pointer",
+  borderRadius: 10, color: "var(--g-on-accent)", fontWeight: 700, cursor: "pointer",
   fontSize: 14, fontFamily: "var(--g-sans)",
 };
 const iconBtnStyle = {

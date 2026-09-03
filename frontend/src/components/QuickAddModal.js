@@ -265,7 +265,7 @@ export default function QuickAddModal({
                 fontWeight: 600,
                 fontFamily: "var(--g-sans)",
                 background: category === c.id ? "var(--g-sage)" : "var(--g-bg)",
-                color: category === c.id ? "#fff" : "var(--g-ink2)",
+                color: category === c.id ? "var(--g-on-accent)" : "var(--g-ink2)",
                 border: `1px solid ${category === c.id ? "var(--g-sage)" : "var(--g-hair)"}`,
                 transition: "all 0.12s",
               }}
@@ -429,7 +429,7 @@ export default function QuickAddModal({
               all: "unset", cursor: canSave() && !saving ? "pointer" : "default",
               padding: "10px 20px",
               background: canSave() && !saving ? "var(--g-sage)" : "var(--g-mute2)",
-              color: "#fff",
+              color: "var(--g-on-accent)",
               borderRadius: 10,
               fontSize: 14,
               fontWeight: 600,

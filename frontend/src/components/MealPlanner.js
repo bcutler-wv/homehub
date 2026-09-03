@@ -399,7 +399,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
         </div>
         <button
           onClick={() => setRecipeForm({ ...EMPTY_RECIPE })}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--g-ink)", border: "none", color: "#fff", padding: "11px 22px", borderRadius: 14, cursor: "pointer", fontSize: 13.5, fontWeight: 600, fontFamily: "var(--g-sans)" }}
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--g-solid)", border: "none", color: "var(--g-on-accent)", padding: "11px 22px", borderRadius: 14, cursor: "pointer", fontSize: 13.5, fontWeight: 600, fontFamily: "var(--g-sans)" }}
         >
           <span style={{ fontSize: 20, lineHeight: 1, marginTop: -1 }}>+</span> New recipe
         </button>
@@ -447,15 +447,15 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
                   borderBottom: `1px solid ${isToday ? "transparent" : "var(--g-hair)"}`,
                 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: isToday ? "rgba(255,255,255,0.75)" : "var(--g-muted)" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: isToday ? "var(--g-on-accent-soft)" : "var(--g-muted)" }}>
                       {day.short.toUpperCase()}
                     </span>
-                    <span style={{ fontSize: 22, fontWeight: 400, fontFamily: "var(--g-serif)", color: isToday ? "#fff" : "var(--g-ink)", lineHeight: 1 }}>
+                    <span style={{ fontSize: 22, fontWeight: 400, fontFamily: "var(--g-serif)", color: isToday ? "var(--g-on-accent)" : "var(--g-ink)", lineHeight: 1 }}>
                       {dateNum}
                     </span>
                   </div>
                   {isToday && (
-                    <p style={{ margin: "2px 0 0", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: "rgba(255,255,255,0.65)" }}>
+                    <p style={{ margin: "2px 0 0", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: "var(--g-on-accent-soft)" }}>
                       Tonight
                     </p>
                   )}
@@ -492,7 +492,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
                       {isToday && recipe && (
                         <button
                           onClick={e => { e.stopPropagation(); setRecipeView(recipe); }}
-                          style={{ marginTop: 10, background: "var(--g-sage)", border: "none", color: "#fff", padding: "7px 10px", borderRadius: 10, cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "var(--g-sans)", display: "flex", alignItems: "center", gap: 4 }}
+                          style={{ marginTop: 10, background: "var(--g-sage)", border: "none", color: "var(--g-on-accent)", padding: "7px 10px", borderRadius: 10, cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "var(--g-sans)", display: "flex", alignItems: "center", gap: 4 }}
                         >
                           ▷ Start cooking
                         </button>
@@ -559,10 +559,10 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
               key={tab}
               onClick={() => setCategoryFilter(tab)}
               style={{
-                background: categoryFilter === tab ? "var(--g-ink)" : "var(--g-card)",
+                background: categoryFilter === tab ? "var(--g-solid)" : "var(--g-card)",
                 border: "1px solid",
-                borderColor: categoryFilter === tab ? "var(--g-ink)" : "var(--g-hair)",
-                color: categoryFilter === tab ? "#fff" : "var(--g-ink2)",
+                borderColor: categoryFilter === tab ? "var(--g-solid)" : "var(--g-hair)",
+                color: categoryFilter === tab ? "var(--g-on-accent)" : "var(--g-ink2)",
                 borderRadius: 20,
                 padding: "6px 16px",
                 cursor: "pointer",
@@ -655,7 +655,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
                   )}
                   <button
                     onClick={e => { e.stopPropagation(); toggleFavourite(recipe); }}
-                    style={{ position: "absolute", top: 9, right: 9, background: "rgba(255,255,255,0.9)", border: "none", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: recipe.isFavourite ? "#e05a5a" : "var(--g-muted)", padding: 0 }}
+                    style={{ position: "absolute", top: 9, right: 9, background: "var(--g-card)", border: "none", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: recipe.isFavourite ? "#e05a5a" : "var(--g-muted)", padding: 0 }}
                   >
                     {recipe.isFavourite ? "♥" : "♡"}
                   </button>
@@ -797,7 +797,7 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
                           style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 10px", borderRadius: 10, cursor: "pointer", background: checked ? "var(--g-sage-bg)" : "transparent", transition: "background 0.1s" }}
                         >
                           <div style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${checked ? "var(--g-sage)" : "var(--g-hair)"}`, background: checked ? "var(--g-sage)" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.1s" }}>
-                            {checked && <span style={{ color: "#fff", fontSize: 10, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                            {checked && <span style={{ color: "var(--g-on-accent)", fontSize: 10, fontWeight: 700, lineHeight: 1 }}>✓</span>}
                           </div>
                           <span style={{ fontSize: 14, color: checked ? "var(--g-muted)" : "var(--g-ink)", textDecoration: checked ? "line-through" : "none", transition: "all 0.1s" }}>
                             {item}
@@ -1081,10 +1081,10 @@ export default function MealPlanner({ recipes, setRecipes, mealPlan, setMealPlan
 }
 
 const labelStyle = { fontSize: 12, color: "var(--g-muted)", display: "block", marginBottom: 6, fontWeight: 600, fontFamily: "var(--g-sans)" };
-const inputStyle = { width: "100%", background: "#fff", border: "1px solid var(--g-hair)", borderRadius: 12, padding: "11px 14px", color: "var(--g-ink)", fontSize: 14, boxSizing: "border-box", fontFamily: "var(--g-sans)" };
-const uploadBtnStyle = { background: "#fff", border: "2px dashed var(--g-hair)", borderRadius: 12, padding: "16px", color: "var(--g-sage)", cursor: "pointer", fontSize: 14, width: "100%", fontWeight: 600, fontFamily: "var(--g-sans)" };
+const inputStyle = { width: "100%", background: "var(--g-card)", border: "1px solid var(--g-hair)", borderRadius: 12, padding: "11px 14px", color: "var(--g-ink)", fontSize: 14, boxSizing: "border-box", fontFamily: "var(--g-sans)" };
+const uploadBtnStyle = { background: "var(--g-card)", border: "2px dashed var(--g-hair)", borderRadius: 12, padding: "16px", color: "var(--g-sage)", cursor: "pointer", fontSize: 14, width: "100%", fontWeight: 600, fontFamily: "var(--g-sans)" };
 const modalFooterStyle = { display: "flex", gap: 12, marginTop: 24 };
 const cancelBtnStyle = { flex: 1, padding: "12px", background: "var(--g-bg)", border: "1px solid var(--g-hair)", borderRadius: 12, color: "var(--g-ink2)", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "var(--g-sans)" };
-const primaryBtnStyle = { flex: 2, padding: "12px", background: "var(--g-sage)", border: "none", borderRadius: 12, color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: "var(--g-sans)" };
+const primaryBtnStyle = { flex: 2, padding: "12px", background: "var(--g-sage)", border: "none", borderRadius: 12, color: "var(--g-on-accent)", fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: "var(--g-sans)" };
 const iconBtn = { background: "var(--g-bg)", border: "1px solid var(--g-hair)", borderRadius: 10, width: 35, height: 35, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--g-ink2)", fontFamily: "var(--g-sans)", padding: 0 };
 const servingBtn = { background: "var(--g-bg)", border: "1px solid var(--g-hair)", borderRadius: 8, width: 28, height: 28, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--g-ink2)", fontFamily: "var(--g-sans)", padding: 0 };

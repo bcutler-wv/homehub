@@ -33,7 +33,7 @@ export default function Login({ onLogin }) {
     fontSize: 14,
     outline: "none",
     fontFamily: "var(--g-sans)",
-    background: "#fff",
+    background: "var(--g-card)",
     color: "var(--g-ink)",
     boxSizing: "border-box",
   };
@@ -77,8 +77,8 @@ export default function Login({ onLogin }) {
             marginBottom: 16,
           }}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M2 9.5L10 3l8 6.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M4 8.5V17h4v-4h4v4h4V8.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M2 9.5L10 3l8 6.5" stroke="var(--g-on-accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4 8.5V17h4v-4h4v4h4V8.5" stroke="var(--g-on-accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
           <h1 style={{
@@ -142,7 +142,7 @@ export default function Login({ onLogin }) {
               width: "100%",
               padding: "12px",
               background: loading ? "var(--g-mute2)" : "var(--g-sage)",
-              color: "#ffffff",
+              color: "var(--g-on-accent)",
               border: "none",
               borderRadius: 12,
               fontSize: 14,

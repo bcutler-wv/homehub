@@ -31,7 +31,7 @@ export default class ErrorBoundary extends Component {
               marginTop: 20,
               background: "var(--g-sage)",
               border: "none",
-              color: "#fff",
+              color: "var(--g-on-accent)",
               padding: "10px 20px",
               borderRadius: 12,
               fontSize: 14,

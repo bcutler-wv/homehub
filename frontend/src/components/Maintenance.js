@@ -125,7 +125,7 @@ export default function Maintenance({ maintenanceTasks, setMaintenanceTasks, api
         </div>
         <button
           onClick={() => setTaskForm({ ...EMPTY_TASK })}
-          style={{ background: "var(--g-sage)", border: "none", color: "#fff", padding: "10px 20px", borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--g-sans)" }}
+          style={{ background: "var(--g-sage)", border: "none", color: "var(--g-on-accent)", padding: "10px 20px", borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--g-sans)" }}
         >
           + New task
         </button>
@@ -339,8 +339,8 @@ export default function Maintenance({ maintenanceTasks, setMaintenanceTasks, api
 }
 
 const labelStyle = { fontSize: 12, color: "var(--g-muted)", display: "block", marginBottom: 6, fontWeight: 600, fontFamily: "var(--g-sans)" };
-const inputStyle = { width: "100%", background: "#fff", border: "1px solid var(--g-hair)", borderRadius: 12, padding: "11px 14px", color: "var(--g-ink)", fontSize: 14, boxSizing: "border-box", fontFamily: "var(--g-sans)" };
-const uploadBtnStyle = { background: "#fff", border: "2px dashed var(--g-hair)", borderRadius: 12, padding: "16px", color: "var(--g-sage)", cursor: "pointer", fontSize: 14, width: "100%", fontWeight: 600, fontFamily: "var(--g-sans)" };
+const inputStyle = { width: "100%", background: "var(--g-card)", border: "1px solid var(--g-hair)", borderRadius: 12, padding: "11px 14px", color: "var(--g-ink)", fontSize: 14, boxSizing: "border-box", fontFamily: "var(--g-sans)" };
+const uploadBtnStyle = { background: "var(--g-card)", border: "2px dashed var(--g-hair)", borderRadius: 12, padding: "16px", color: "var(--g-sage)", cursor: "pointer", fontSize: 14, width: "100%", fontWeight: 600, fontFamily: "var(--g-sans)" };
 const modalFooterStyle = { display: "flex", gap: 12, marginTop: 24 };
 const cancelBtnStyle = { flex: 1, padding: "12px", background: "var(--g-bg)", border: "1px solid var(--g-hair)", borderRadius: 12, color: "var(--g-ink2)", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "var(--g-sans)" };
-const primaryBtnStyle = { flex: 2, padding: "12px", background: "var(--g-sage)", border: "none", borderRadius: 12, color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: "var(--g-sans)" };
+const primaryBtnStyle = { flex: 2, padding: "12px", background: "var(--g-sage)", border: "none", borderRadius: 12, color: "var(--g-on-accent)", fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: "var(--g-sans)" };

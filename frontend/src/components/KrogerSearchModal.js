@@ -157,7 +157,7 @@ export default function KrogerSearchModal({ initialTerm = "", title = "Add from 
             type="submit"
             disabled={!term.trim() || loading}
             style={{
-              padding: "10px 18px", background: G.sage, color: "#fff", border: "none",
+              padding: "10px 18px", background: G.sage, color: "var(--g-on-accent)", border: "none",
               borderRadius: 12, fontWeight: 600, fontSize: 14, fontFamily: G.sans,
               cursor: term.trim() && !loading ? "pointer" : "default",
               opacity: term.trim() && !loading ? 1 : 0.5,

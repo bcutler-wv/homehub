@@ -209,3 +209,53 @@ test("dragging a day heading moves every task on that day", async ({ page }) => 
   await expect(columnFor(page, "Saturday")).toContainText("Second chore");
   await expect(columnFor(page, "Monday")).not.toContainText("chore");
 });
+
+// Relative luminance per WCAG, so the assertion is a real ratio rather than a
+// screenshot nobody looks at.
+const contrastRatio = (fg, bg) => {
+  const parse = (c) => (c.match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number);
+  const lum = ([r, g, b]) => {
+    const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const [hi, lo] = [lum(parse(fg)), lum(parse(bg))].sort((a, b) => b - a);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+test("dark theme keeps text readable", async ({ page }) => {
+  await stubWeather(page);
+  await login(page);
+
+  // A note gives us the sticky-note surface, which keeps its pale tone in dark
+  // and so needs its own ink rather than the inverted body colour.
+  await page.getByRole("button", { name: /New note/ }).click();
+  await page.getByLabel("Note text").fill("bins out **Thursday**");
+  await page.getByRole("button", { name: "Save note" }).click();
+  // Wait for the editor to close, or the textarea still holds the same words.
+  await expect(page.getByLabel("Note text")).toBeHidden();
+  await expect(page.locator(".note-body").first()).toBeVisible();
+
+  await page.getByRole("button", { name: /Switch to dark theme/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  // Colour transitions are animated; measure the settled value.
+  await page.waitForTimeout(600);
+
+  for (const selector of ["h1", ".nav-btn--active", ".sidebar-quickadd", ".note-body"]) {
+    const { fg, bg } = await page.locator(selector).first().evaluate((node) => {
+      const style = getComputedStyle(node);
+      let el = node;
+      let bg = style.backgroundColor;
+      while (el && (bg === "rgba(0, 0, 0, 0)" || bg === "transparent")) {
+        el = el.parentElement;
+        if (!el) break;
+        bg = getComputedStyle(el).backgroundColor;
+      }
+      return { fg: style.color, bg };
+    });
+    expect(contrastRatio(fg, bg), `${selector} contrast in dark`).toBeGreaterThan(4.5);
+  }
+
+  // The choice has to survive a reload, per user.
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});

@@ -62,14 +62,26 @@ const NAV_ICONS = {
 };
 
 const HomeIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--g-on-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>
   </svg>
 );
 
 const PlusIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--g-on-accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 5v14M5 12h14"/>
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z"/>
   </svg>
 );
 
@@ -79,9 +91,10 @@ const SearchIcon = () => (
   </svg>
 );
 
-export default function Sidebar({ activeTool, setActiveTool, tools, showToast, currentUser, onLogout, settings, syncStatus = "online", syncQueueCount = 0, onOpenQuickAdd, onOpenSearch }) {
+export default function Sidebar({ activeTool, setActiveTool, tools, showToast, currentUser, onLogout, settings, syncStatus = "online", syncQueueCount = 0, onOpenQuickAdd, onOpenSearch, theme = "light", onToggleTheme }) {
   const visibleTools = tools.filter(t => t.id !== "admin");
   const isAdmin = currentUser?.role === "admin";
+  const isDark = theme === "dark";
   const appName   = settings?.appName       || "HomeHub";
   const household = settings?.householdName || "My Household";
 
@@ -160,10 +173,22 @@ export default function Sidebar({ activeTool, setActiveTool, tools, showToast, c
             <span>{syncStatus === "syncing" ? "Syncing" : syncStatus === "online" ? "Online" : "Offline"}</span>
             {syncQueueCount > 0 && <span>{syncQueueCount} queued</span>}
           </div>
-          <p style={{ margin: 0, fontFamily: "var(--g-sans)", fontSize: 12, color: "var(--g-muted)" }}>
-            Signed in as{" "}
-            <strong style={{ color: "var(--g-ink2)", fontWeight: 600 }}>{currentUser.username}</strong>
-          </p>
+          <div className="sidebar-user-row">
+            <p style={{ margin: 0, fontFamily: "var(--g-sans)", fontSize: 12, color: "var(--g-muted)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+              Signed in as{" "}
+              <strong style={{ color: "var(--g-ink2)", fontWeight: 600 }}>{currentUser.username}</strong>
+            </p>
+            <button
+              type="button"
+              className="sidebar-theme-toggle"
+              onClick={onToggleTheme}
+              aria-pressed={isDark}
+              aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+              title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+            >
+              {isDark ? <SunIcon /> : <MoonIcon />}
+            </button>
+          </div>
           <button
             onClick={onLogout}
             style={{

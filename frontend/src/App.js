@@ -9,6 +9,7 @@ import InvoiceTracker from "./components/InvoiceTracker";
 import MealPlanner from "./components/MealPlanner";
 import TodoTasks from "./components/TodoTasks";
 import { applyFonts } from "./lib/fonts";
+import { applyTheme, otherTheme, prefersDark, readStoredTheme, resolveTheme, storeTheme, DEFAULT_THEME } from "./lib/theme";
 import Maintenance from "./components/Maintenance";
 import CalendarView from "./components/CalendarView";
 import PlantManager from "./components/PlantManager";
@@ -121,6 +122,7 @@ export default function App() {
   const [searchOpen, setSearchOpen]         = useState(false);
   const [syncStatus, setSyncStatus]         = useState("online");
   const [syncQueueCount, setSyncQueueCount] = useState(() => loadSyncQueue().length);
+  const [theme, setTheme]                   = useState(DEFAULT_THEME);
 
   const applySettings = useCallback((s) => {
     const normalized = {
@@ -134,6 +136,22 @@ export default function App() {
     applyFonts(normalized.headingFont, normalized.bodyFont);
     if (normalized.appName) document.title = normalized.appName;
   }, []);
+
+  // Theme is stored per user on this device, so it can only settle once we
+  // know who is signed in. Until then (and on the login screen) follow the OS.
+  const userId = currentUser?.id ?? null;
+  useEffect(() => {
+    setTheme(applyTheme(resolveTheme(readStoredTheme(userId), prefersDark())));
+  }, [userId]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(current => {
+      const next = otherTheme(current);
+      applyTheme(next);
+      storeTheme(userId, next);
+      return next;
+    });
+  }, [userId]);
 
   const enabledFeatures = useMemo(
     () => ({ ...DEFAULT_ENABLED_FEATURES, ...(settings.enabledFeatures || {}) }),
@@ -523,7 +541,7 @@ export default function App() {
         />
       )}
       <div className="app-layout">
-        <Sidebar activeTool={activeTool} setActiveTool={setActiveTool} tools={enabledTools} showToast={showToast} currentUser={currentUser} onLogout={handleLogout} settings={settings} syncStatus={syncStatus} syncQueueCount={syncQueueCount} onOpenQuickAdd={() => setQuickAddOpen(true)} onOpenSearch={() => setSearchOpen(true)} />
+        <Sidebar activeTool={activeTool} setActiveTool={setActiveTool} tools={enabledTools} showToast={showToast} currentUser={currentUser} onLogout={handleLogout} settings={settings} syncStatus={syncStatus} syncQueueCount={syncQueueCount} onOpenQuickAdd={() => setQuickAddOpen(true)} onOpenSearch={() => setSearchOpen(true)} theme={theme} onToggleTheme={toggleTheme} />
         <main className="app-main">
           {activeTool === "dashboard" && (
             <ErrorBoundary key="dashboard">

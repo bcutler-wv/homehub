@@ -22,10 +22,115 @@
   --g-sky:       #5d7c95;
   --g-sky-bg:    #dde6ee;
 
+  /* Text that sits on a filled accent (--g-sage) or on --g-solid. */
+  --g-on-accent: #ffffff;
+  /* High-emphasis filled button. Reads as "ink" in light, as warm paper in dark. */
+  --g-solid:     #1f2a24;
+  /* A hairline you need to actually see — checkbox and radio outlines. */
+  --g-hair-str:  rgba(31, 42, 36, 0.28);
+  /* Translucent panel over the page background (sidebar search, mobile tab bar). */
+  --g-veil:      rgba(255, 255, 255, 0.58);
+  --g-bar:       rgba(247, 243, 234, 0.95);
+  /* A tint of --g-on-accent, for secondary copy on a filled accent. */
+  --g-on-accent-soft: rgba(255, 255, 255, 0.75);
+  /* Backdrop behind a document preview — deliberately dark in both themes, so
+     what sits on it keeps light ink in both themes too. */
+  --g-viewer:        #1e293b;
+  --g-on-viewer:     rgba(255, 255, 255, 0.86);
+  --g-on-viewer-dim: rgba(255, 255, 255, 0.5);
+
+  /* Planner accents: a rose set that sits alongside the sage. */
+  --planner-accent:      #9a6f74;
+  --planner-accent-deep: #8d5c63;
+  --planner-chip:        #f6eee9;
+  --planner-chip-ink:    #6f5650;
+  --planner-tint:        #fffaf8;
+  --planner-tint2:       #fbf7f4;
+  --planner-done:        #9b958d;
+  --planner-active-ink:  #6f3f46;
+  --planner-edge:        rgba(141, 92, 99, 0.30);
+  --planner-edge-strong: rgba(141, 92, 99, 0.52);
+  --planner-today-ring:  rgba(239, 212, 216, 0.55);
+  --planner-hairline:    rgba(117, 88, 82, 0.11);
+
+  /* Corkboard notes keep their light sticky tones in both themes (see the
+     Corkboard section), so their ink stays dark in both themes too. */
+  --note-ink:      #2b241f;
+  --note-ink2:     #3a3129;
+  --note-meta:     rgba(53, 43, 36, 0.62);
+  --note-pin:      rgba(53, 43, 36, 0.35);
+  --note-chip:     rgba(255, 255, 255, 0.6);
+  --note-chip-ink: #4a3f36;
+  --note-accent:   #a85a3e;
+  --note-link:     #3e5a44;
+  --note-paper:    #f7f3ea;
+  --note-edge:     rgba(53, 43, 36, 0.14);
+
   --g-serif:     "Instrument Serif", "Newsreader", Georgia, serif;
   --g-sans:      "DM Sans", -apple-system, system-ui, sans-serif;
   --g-shadow:    0 1px 2px rgba(31,42,36,0.04), 0 8px 24px rgba(31,42,36,0.06);
   --g-shadow-sm: 0 1px 2px rgba(31,42,36,0.05);
+
+  /* Tells the browser which way to paint scrollbars and native form controls. */
+  color-scheme: light;
+}
+
+/* ── Dark theme ──────────────────────────────────────────────────────────────
+   Same token names, warmer-than-neutral values: a brown-black ground rather
+   than grey so the paper/planner character survives. Only values change here —
+   no component rule needs a dark-mode variant.
+
+   Accents invert their role: in light, --g-sage is a mid green carrying white
+   text; in dark it is a pale green carrying near-black text (--g-on-accent),
+   which is the only way to keep a filled button above 4.5:1 without muddying
+   the accent. --g-*-dark tokens are the "text on a --g-*-bg tint" role, so in
+   dark they become the light member of the pair. */
+[data-theme="dark"] {
+  --g-bg:        #17150f;
+  --g-bg2:       #201d16;
+  --g-card:      #221f18;
+  --g-ink:       #f3ede0;
+  --g-ink2:      #ded5c4;
+  --g-muted:     #a89f8d;
+  --g-mute2:     #8f8676;
+  --g-hair:      rgba(243, 237, 224, 0.12);
+  --g-hair2:     rgba(243, 237, 224, 0.06);
+
+  --g-sage:      #8ab68e;
+  --g-sage-bg:   #24352a;
+  --g-sage-dark: #9ecaa2;
+  --g-honey:     #d9ad63;
+  --g-honey-bg:  #3a2f19;
+  --g-brick:     #e09872;
+  --g-brick-bg:  #3d2419;
+  --g-sky:       #8fb4cf;
+  --g-sky-bg:    #1e2e3a;
+
+  --g-on-accent: #16130e;
+  --g-on-accent-soft: rgba(22, 19, 14, 0.72);
+  --g-solid:     #e6dccb;
+  --g-hair-str:  rgba(243, 237, 224, 0.32);
+  --g-veil:      rgba(243, 237, 224, 0.05);
+  --g-bar:       rgba(23, 21, 15, 0.95);
+
+  --planner-accent:      #cb9ba1;
+  --planner-accent-deep: #dcaab1;
+  --planner-chip:        #352a28;
+  --planner-chip-ink:    #e3c6c1;
+  --planner-tint:        #262120;
+  --planner-tint2:       #1f1b1a;
+  --planner-done:        #8f8676;
+  --planner-active-ink:  #9ecaa2;
+  --planner-edge:        rgba(220, 170, 177, 0.28);
+  --planner-edge-strong: rgba(220, 170, 177, 0.48);
+  --planner-today-ring:  rgba(220, 170, 177, 0.22);
+  --planner-hairline:    rgba(243, 237, 224, 0.10);
+
+  /* On a dark ground a soft shadow does nothing, so lean on real black. */
+  --g-shadow:    0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --g-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -269,8 +374,8 @@ body {
   padding: 0 18px;
   border: 0;
   border-radius: 14px;
-  background: var(--g-ink);
-  color: #fff;
+  background: var(--g-solid);
+  color: var(--g-on-accent);
   font-family: var(--g-sans);
   font-size: 13px;
   font-weight: 700;
@@ -371,7 +476,7 @@ body {
   align-items: center;
   gap: 6px;
   margin-left: 8px;
-  color: #9a6f74;
+  color: var(--planner-accent);
   font-family: var(--g-sans);
   font-size: 10px;
   font-weight: 800;
@@ -424,7 +529,7 @@ body {
 }
 
 .planner-goal span:last-child {
-  color: #9a6f74;
+  color: var(--planner-accent);
   font-size: 11px;
   font-weight: 900;
 }
@@ -441,7 +546,7 @@ body {
 .planner-day-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(53, 43, 36, 0.08);
-  border-color: rgba(141, 92, 99, 0.36);
+  border-color: var(--planner-edge);
 }
 
 .planner-day-card:focus-visible,
@@ -481,15 +586,15 @@ body {
 }
 
 .planner-day-card.is-today {
-  border-color: rgba(141, 92, 99, 0.52);
-  box-shadow: inset 0 0 0 2px rgba(239, 212, 216, 0.55);
+  border-color: var(--planner-edge-strong);
+  box-shadow: inset 0 0 0 2px var(--planner-today-ring);
 }
 
 .planner-day-header {
   justify-content: space-between;
   min-height: 52px;
   padding: 8px 14px;
-  border-bottom: 1px solid rgba(117, 88, 82, 0.11);
+  border-bottom: 1px solid var(--planner-hairline);
 }
 
 .planner-day-heading {
@@ -512,7 +617,7 @@ body {
 }
 
 .planner-day-count {
-  color: #8d5c63;
+  color: var(--planner-accent-deep);
   font-size: 11px;
   letter-spacing: 0.6px;
 }
@@ -560,21 +665,21 @@ body {
 }
 
 .planner-day-task.is-done .planner-day-task-title {
-  color: #9b958d;
+  color: var(--planner-done);
   text-decoration: line-through;
 }
 
 .planner-mini-check {
   width: 11px;
   height: 11px;
-  border: 1.4px solid rgba(39, 35, 33, 0.45);
+  border: 1.4px solid var(--g-hair-str);
   border-radius: 50%;
-  background: #fff;
+  background: var(--g-card);
 }
 
 .planner-day-task.is-done .planner-mini-check {
   background: var(--planner-pink);
-  border-color: #8d5c63;
+  border-color: var(--planner-accent-deep);
 }
 
 .planner-day-task-title {
@@ -613,7 +718,7 @@ li.planner-empty-line {
   justify-content: space-between;
   min-height: 33px;
   padding: 0 12px 10px 18px;
-  color: #9a6f74;
+  color: var(--planner-accent);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1px;
@@ -626,10 +731,10 @@ li.planner-empty-line {
   justify-content: center;
   width: 26px;
   height: 26px;
-  border: 1px solid rgba(141, 92, 99, 0.3);
+  border: 1px solid var(--planner-edge);
   border-radius: 50%;
-  background: #fff;
-  color: #8d5c63;
+  background: var(--g-card);
+  color: var(--planner-accent-deep);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -642,8 +747,8 @@ li.planner-empty-line {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #f6eee9;
-  color: #6f5650;
+  background: var(--planner-chip);
+  color: var(--planner-chip-ink);
   font-size: 10px;
   font-weight: 900;
   flex-shrink: 0;
@@ -656,7 +761,7 @@ li.planner-empty-line {
 }
 
 .planner-modal {
-  border: 1px solid rgba(117, 88, 82, 0.15);
+  border: 1px solid var(--planner-hairline);
   border-radius: 16px;
 }
 
@@ -670,7 +775,7 @@ li.planner-empty-line {
 
 .planner-modal-header p {
   margin: 0;
-  color: #9a6f74;
+  color: var(--planner-accent);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 1.2px;
@@ -692,7 +797,7 @@ li.planner-empty-line {
   height: 36px;
   border: 1px solid var(--planner-border);
   border-radius: 50%;
-  background: #fff;
+  background: var(--g-card);
   color: var(--planner-ink);
   cursor: pointer;
   font-family: var(--g-sans);
@@ -709,7 +814,7 @@ li.planner-empty-line {
   padding: 26px 18px;
   border: 1px dashed var(--planner-border);
   border-radius: 10px;
-  background: #fffaf8;
+  background: var(--planner-tint);
   text-align: center;
 }
 
@@ -728,11 +833,11 @@ li.planner-empty-line {
   padding: 12px 14px;
   border: 1px solid var(--planner-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--g-card);
 }
 
 .planner-check-row.is-done {
-  background: #fbf7f4;
+  background: var(--planner-tint2);
 }
 
 .planner-check-toggle {
@@ -740,8 +845,8 @@ li.planner-empty-line {
   height: 28px;
   border: 1.5px solid var(--planner-border);
   border-radius: 50%;
-  background: #fff;
-  color: #8d5c63;
+  background: var(--g-card);
+  color: var(--planner-accent-deep);
   cursor: pointer;
   font-size: 9px;
   font-weight: 900;
@@ -749,7 +854,7 @@ li.planner-empty-line {
 
 .planner-check-row.is-done .planner-check-toggle {
   background: var(--planner-pink);
-  border-color: #8d5c63;
+  border-color: var(--planner-accent-deep);
 }
 
 .planner-check-content {
@@ -767,7 +872,7 @@ li.planner-empty-line {
 }
 
 .planner-check-row.is-done .planner-check-title > span:first-child {
-  color: #9b958d;
+  color: var(--planner-done);
   text-decoration: line-through;
 }
 
@@ -784,8 +889,8 @@ li.planner-empty-line {
   min-height: 22px;
   padding: 0 8px;
   border-radius: 999px;
-  background: #f6eee9;
-  color: #8d5c63;
+  background: var(--planner-chip);
+  color: var(--planner-accent-deep);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.5px;
@@ -819,7 +924,7 @@ li.planner-empty-line {
 .planner-check-actions button {
   padding: 0 12px;
   border: 1px solid var(--planner-border);
-  background: #fffaf8;
+  background: var(--planner-tint);
   color: var(--planner-ink);
 }
 
@@ -842,13 +947,13 @@ li.planner-empty-line {
 
 .planner-primary-btn {
   border: 0;
-  background: var(--planner-ink);
-  color: #fff;
+  background: var(--g-solid);
+  color: var(--g-on-accent);
 }
 
 .planner-secondary-btn {
   border: 1px solid var(--planner-border);
-  background: #fffaf8;
+  background: var(--planner-tint);
   color: var(--planner-ink);
 }
 
@@ -882,7 +987,7 @@ li.planner-empty-line {
   width: 100%;
   border: 1px solid var(--planner-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--g-card);
   color: var(--planner-ink);
   font-family: var(--g-sans);
   font-size: 14px;
@@ -917,7 +1022,7 @@ li.planner-empty-line {
   min-height: 40px;
   border: 1px solid var(--planner-border);
   border-radius: 999px;
-  background: #fff;
+  background: var(--g-card);
   color: var(--planner-ink);
   font-family: var(--g-sans);
   font-size: 13px;
@@ -928,8 +1033,8 @@ li.planner-empty-line {
 .planner-segmented button.is-active,
 .planner-weekday-picker button.is-active {
   background: var(--planner-pink);
-  border-color: #8d5c63;
-  color: #6f3f46;
+  border-color: var(--planner-accent-deep);
+  color: var(--planner-active-ink);
 }
 
 .planner-weekday-picker {
@@ -1221,7 +1326,7 @@ li.planner-empty-line {
   padding: 11px 12px;
   border: 1px solid var(--g-hair);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--g-veil);
   color: var(--g-muted);
   box-shadow: var(--g-shadow-sm);
   cursor: pointer;
@@ -1329,7 +1434,7 @@ li.planner-empty-line {
   padding: 13px 14px;
   border-radius: 14px;
   background: var(--g-sage);
-  color: #fff;
+  color: var(--g-on-accent);
   font-family: var(--g-sans);
   font-size: 14px;
   font-weight: 600;
@@ -1350,6 +1455,38 @@ li.planner-empty-line {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.sidebar-user-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-theme-toggle {
+  all: unset;
+  flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  border: 1px solid var(--g-hair);
+  color: var(--g-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-theme-toggle:hover {
+  background: var(--g-card);
+  color: var(--g-ink2);
+}
+
+.sidebar-theme-toggle:focus-visible {
+  outline: 2px solid var(--g-sage);
+  outline-offset: 2px;
 }
 
 /* ── Tablet (iPad — 641–1024px) ──────────────────────────────────────────── */
@@ -1401,7 +1538,7 @@ li.planner-empty-line {
     height: auto;
     border-right: none;
     border-top: 1px solid var(--g-hair);
-    background: rgba(247, 243, 234, 0.95);
+    background: var(--g-bar);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     padding: 8px 4px;
@@ -1415,8 +1552,35 @@ li.planner-empty-line {
   }
 
   .sidebar-header   { display: none; }
-  .sidebar-user     { display: none; }
   .sidebar-quickadd { display: none; }
+
+  /* The user block is desktop chrome, but the theme toggle has to reach the
+     phone — dark mode is most wanted on the device that is used in the dark.
+     Strip the block down to just the toggle and let it sit as a tab. */
+  .sidebar-user {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    min-height: 56px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    gap: 0;
+  }
+
+  .sidebar-user > :not(.sidebar-user-row) { display: none; }
+  .sidebar-user-row > p { display: none; }
+  .sidebar-user-row { gap: 0; width: auto; }
+
+  .sidebar-theme-toggle {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    background: transparent;
+  }
   .sidebar-search {
     display: flex;
     flex-direction: column;
@@ -1564,7 +1728,7 @@ li.planner-empty-line {
   border-right: 1px solid var(--g-hair);
   display: flex;
   flex-direction: column;
-  background: #1e293b;
+  background: var(--g-viewer);
   overflow: hidden;
 }
 .invoice-modal-form {
@@ -1875,7 +2039,7 @@ li.planner-empty-line {
 .shopping-row-check {
   width: 16px;
   height: 16px;
-  border: 1.5px solid rgba(31, 42, 36, 0.28);
+  border: 1.5px solid var(--g-hair-str);
   border-radius: 5px;
   display: flex;
   align-items: center;
@@ -2055,7 +2219,7 @@ li.planner-empty-line {
   border: none;
   border-radius: 12px;
   background: var(--g-sage);
-  color: #fff;
+  color: var(--g-on-accent);
   font-family: var(--g-sans);
   font-size: 13.5px;
   font-weight: 600;
@@ -2107,7 +2271,7 @@ li.planner-empty-line {
   align-items: center;
   gap: 6px;
   font-size: 10.5px;
-  color: rgba(53, 43, 36, 0.62);
+  color: var(--note-meta);
 }
 
 .note-author {
@@ -2134,12 +2298,12 @@ li.planner-empty-line {
   justify-content: center;
   border-radius: 5px;
   font-size: 13px;
-  color: rgba(53, 43, 36, 0.35);
+  color: var(--note-pin);
   transform: rotate(-45deg);
 }
 
 .note-pin.is-on {
-  color: var(--g-brick);
+  color: var(--note-accent);
 }
 
 .note-title {
@@ -2148,7 +2312,7 @@ li.planner-empty-line {
   font-size: 17px;
   font-weight: 400;
   line-height: 1.2;
-  color: var(--g-ink);
+  color: var(--note-ink);
 }
 
 .note-photo {
@@ -2162,7 +2326,7 @@ li.planner-empty-line {
 .note-body {
   font-size: 13px;
   line-height: 1.45;
-  color: #3a3129;
+  color: var(--note-ink2);
   overflow-wrap: anywhere;
 }
 
@@ -2170,7 +2334,7 @@ li.planner-empty-line {
 .note-body p:last-child { margin-bottom: 0; }
 .note-body ul, .note-body ol { margin: 0 0 6px; padding-left: 18px; }
 .note-body li { margin-bottom: 2px; }
-.note-body a { color: var(--g-sage-dark); }
+.note-body a { color: var(--note-link); }
 
 .note-code {
   padding: 1px 4px;
@@ -2190,10 +2354,10 @@ li.planner-empty-line {
   cursor: pointer;
   padding: 3px 8px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--note-chip);
   font-size: 10.5px;
   font-weight: 700;
-  color: #4a3f36;
+  color: var(--note-chip-ink);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2212,7 +2376,7 @@ li.planner-empty-line {
   justify-content: center;
   border-radius: 6px;
   font-size: 15px;
-  color: var(--g-brick);
+  color: var(--note-accent);
   cursor: pointer;
 }
 
@@ -2275,9 +2439,9 @@ li.planner-empty-line {
 .note-preview {
   margin-top: 10px;
   padding: 10px 12px;
-  border: 1px dashed var(--g-hair);
+  border: 1px dashed var(--note-edge);
   border-radius: 12px;
-  background: var(--g-bg);
+  background: var(--note-paper);
 }
 
 .note-preview-label {
@@ -2287,7 +2451,7 @@ li.planner-empty-line {
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: var(--g-mute2);
+  color: var(--note-meta);
 }
 
 .note-editor-row {
@@ -2383,6 +2547,19 @@ li.planner-empty-line {
 
 .note-photo-remove { color: var(--g-brick) !important; background: var(--g-brick-bg) !important; }
 
+/* The editor is tall — preview, colours, two link pickers and a photo row all
+   sit above the footer — so on a phone Save fell below the fold. Pin it to the
+   bottom of the scrolling modal instead, bleeding over the box's 32px padding. */
+.note-editor .planner-modal-footer {
+  position: sticky;
+  bottom: -32px;
+  z-index: 2;
+  margin: 20px -32px -32px;
+  padding: 14px 32px calc(32px + env(safe-area-inset-bottom));
+  background: var(--g-card);
+  border-top: 1px solid var(--g-hair);
+}
+
 @media (max-width: 560px) {
   .corkboard-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .note-editor-grid { grid-template-columns: 1fr; }
@@ -2466,7 +2643,7 @@ li.planner-empty-line {
 }
 
 .planner-loose-row.is-done .planner-loose-title {
-  color: #9b958d;
+  color: var(--planner-done);
   text-decoration: line-through;
 }
 
