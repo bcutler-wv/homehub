@@ -1,6 +1,7 @@
 import {
   taskAppearsOnDay, applyThisWeekMove, applyEveryWeekMove, applyOnceMove,
-  pruneStaleMoves, completionKey, normalizeTasks, applyDayMove,
+  pruneStaleMoves, completionKey, normalizeTasks, applyDayMove, isTaskOnDay, monthlyDayFor,
+  applyEveryMonthMove,
 } from "./taskSchedule";
 
 const MON = "2026-08-24", TUE = "2026-08-25", THU = "2026-08-27";
@@ -152,5 +153,92 @@ describe("applyDayMove", () => {
   test("an empty day changes nothing", () => {
     const data = { items: [weekday(1, "A")], completions: {}, moves: {} };
     expect(applyDayMove(data, [], mon, tue, "week")).toBe(data);
+  });
+});
+
+describe("monthly and no-deadline tasks", () => {
+  const monthly = (monthDay) => ({ id: 10, title: "Filters", type: "monthly", monthDay, active: true });
+
+  test("a monthly task lands on its day of the month", () => {
+    expect(isTaskOnDay(monthly(15), "2026-09-15")).toBe(true);
+    expect(isTaskOnDay(monthly(15), "2026-09-14")).toBe(false);
+    expect(isTaskOnDay(monthly(15), "2026-10-15")).toBe(true);
+  });
+
+  test("a day-31 task still happens in a short month, on the last day", () => {
+    // February 2026 has 28 days; the task must not silently skip the month.
+    expect(monthlyDayFor(monthly(31), "2026-02-10")).toBe(28);
+    expect(isTaskOnDay(monthly(31), "2026-02-28")).toBe(true);
+    expect(isTaskOnDay(monthly(31), "2026-02-27")).toBe(false);
+
+    expect(monthlyDayFor(monthly(31), "2026-04-10")).toBe(30);
+    expect(isTaskOnDay(monthly(31), "2026-04-30")).toBe(true);
+
+    // A leap year gains the 29th.
+    expect(monthlyDayFor(monthly(30), "2028-02-10")).toBe(29);
+  });
+
+  test("a monthly task with no day set never lands", () => {
+    expect(monthlyDayFor({ type: "monthly" }, "2026-09-15")).toBeNull();
+    expect(isTaskOnDay({ id: 1, type: "monthly", active: true }, "2026-09-15")).toBe(false);
+  });
+
+  test("an inactive monthly task does not land", () => {
+    expect(isTaskOnDay({ ...monthly(15), active: false }, "2026-09-15")).toBe(false);
+  });
+
+  test("a no-deadline task never belongs to a day", () => {
+    const misc = { id: 11, title: "Sort the loft", type: "misc", active: true };
+    expect(isTaskOnDay(misc, "2026-09-15")).toBe(false);
+    expect(isTaskOnDay(misc, "2026-09-16")).toBe(false);
+  });
+});
+
+describe("moving a monthly task", () => {
+  const monthly = { id: 20, title: "Filters", type: "monthly", monthDay: 15, active: true };
+  const from = "2026-09-15", to = "2026-09-17";
+
+  test("permanently moving one rewrites its day of the month", () => {
+    const data = { items: [monthly], completions: {}, moves: {} };
+    const next = applyEveryMonthMove(data, monthly, from, to);
+
+    expect(next.items[0].monthDay).toBe(17);
+    expect(isTaskOnDay(next.items[0], to)).toBe(true);
+    expect(isTaskOnDay(next.items[0], from)).toBe(false);
+  });
+
+  test("the completion follows and the task still renders where it landed", () => {
+    const data = {
+      items: [monthly],
+      completions: { [`20:${from}`]: { completed: true } },
+      moves: {},
+    };
+    const next = applyEveryMonthMove(data, monthly, from, to);
+
+    expect(next.completions[`20:${to}`]).toEqual({ completed: true });
+    expect(next.completions[`20:${from}`]).toBeUndefined();
+    // The bug this guards: a rewritten schedule that no longer matches the day
+    // the completion was moved to.
+    expect(isTaskOnDay(next.items[0], to)).toBe(true);
+  });
+
+  test("a whole-day permanent move reschedules monthly and weekly tasks each on their own terms", () => {
+    const weekly = { id: 21, title: "Sweep", type: "weekday", weekdays: [2], active: true };
+    const data = { items: [monthly, weekly], completions: {}, moves: {} };
+    const next = applyDayMove(data, data.items, from, to, "always");
+
+    // Tuesday the 15th -> Thursday the 17th.
+    expect(next.items.find(t => t.id === 20).monthDay).toBe(17);
+    expect(next.items.find(t => t.id === 21).weekdays).toEqual([4]);
+    // The monthly task must not have had its weekdays rewritten instead.
+    expect(next.items.find(t => t.id === 20).weekdays).toBeUndefined();
+  });
+
+  test("a this-week move leaves the monthly schedule alone", () => {
+    const data = { items: [monthly], completions: {}, moves: {} };
+    const next = applyDayMove(data, [monthly], from, to, "week");
+
+    expect(next.items[0].monthDay).toBe(15);
+    expect(next.moves).toEqual({ [`20:${from}`]: to });
   });
 });

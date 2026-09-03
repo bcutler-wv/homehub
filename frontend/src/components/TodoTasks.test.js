@@ -225,4 +225,144 @@ describe("TodoTasks", () => {
     expect(withTasks).toHaveLength(1);
     expect(withTasks[0].textContent).toContain("Monday");
   });
+
+  test("a no-deadline task lands in Miscellaneous, not on a day", () => {
+    renderBoard({
+      items: [
+        { id: 1, title: "Sort the loft", type: "misc", active: true },
+        { id: 2, title: "Sweep kitchen", type: "weekday", weekdays: [1], active: true },
+      ],
+      completions: {},
+      moves: {},
+    }, jest.fn());
+
+    const misc = document.querySelector(".planner-panel--misc");
+    expect(within(misc).getByText("Sort the loft")).toBeInTheDocument();
+    // It must not appear in any day column.
+    const board = document.querySelector(".planner-days-grid");
+    expect(within(board).queryByText("Sort the loft")).not.toBeInTheDocument();
+    expect(within(board).getByText("Sweep kitchen")).toBeInTheDocument();
+  });
+
+  test("a monthly task is listed with its day and appears on that date", () => {
+    const monthly = { id: 3, title: "Change filters", type: "monthly", monthDay: 15, active: true };
+    renderBoard({ items: [monthly], completions: {}, moves: {} }, jest.fn());
+
+    const panel = document.querySelector(".planner-panel--monthly");
+    expect(within(panel).getByText("Change filters")).toBeInTheDocument();
+    expect(within(panel).getByText("15th")).toBeInTheDocument();
+  });
+
+  test("a miscellaneous task can be ticked off without a day", async () => {
+    const setTasks = jest.fn();
+    renderBoard({
+      items: [{ id: 1, title: "Sort the loft", type: "misc", active: true }],
+      completions: {},
+      moves: {},
+    }, setTasks);
+
+    fireEvent.click(screen.getByLabelText("Mark Sort the loft complete"));
+
+    await waitFor(() => expect(setTasks).toHaveBeenCalled());
+    // Completion is keyed on a dayless slot, so it survives week navigation.
+    expect(setTasks.mock.calls[0][0].completions["1:anytime"].completed).toBe(true);
+  });
+
+  test("the new task form offers Monthly and a No deadline switch", async () => {
+    renderBoard({ items: [], completions: {}, moves: {} }, jest.fn());
+    fireEvent.click(screen.getByRole("button", { name: /New task/i }));
+
+    expect(await screen.findByRole("button", { name: "Monthly" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Weekly" })).toBeInTheDocument();
+
+    // No deadline disables the date rather than hiding it.
+    const noDeadline = screen.getByRole("button", { name: "No deadline" });
+    expect(noDeadline).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(noDeadline);
+    expect(screen.getByRole("button", { name: "No deadline" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/Lands in Miscellaneous/)).toBeInTheDocument();
+  });
+
+  test("saving a monthly task keeps its day and drops the unused date", async () => {
+    const setTasks = jest.fn();
+    renderBoard({ items: [], completions: {}, moves: {} }, setTasks);
+
+    fireEvent.click(screen.getByRole("button", { name: /New task/i }));
+    fireEvent.change(screen.getByPlaceholderText("e.g. Pack school bags"), { target: { value: "Change filters" } });
+    fireEvent.click(screen.getByRole("button", { name: "Monthly" }));
+    fireEvent.change(screen.getByRole("combobox", { name: /Day of the month/i }), { target: { value: "15" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save task" }));
+
+    await waitFor(() => expect(setTasks).toHaveBeenCalled());
+    const saved = setTasks.mock.calls[0][0].items[0];
+    expect(saved).toMatchObject({ title: "Change filters", type: "monthly", monthDay: 15 });
+    expect(saved.date).toBe("");
+    expect(saved.weekdays).toEqual([]);
+  });
+
+  test("moving a monthly task permanently reschedules the month, not the week", async () => {
+    const setTasks = jest.fn();
+    // Pick whichever day of this week the monthly task falls on.
+    const monday = weekDayKey(0);
+    const monthDay = Number(monday.slice(-2));
+    const tuesday = weekDayKey(1);
+
+    renderBoard({
+      items: [{ id: 3, title: "Change filters", type: "monthly", monthDay, active: true }],
+      completions: {},
+      moves: {},
+    }, setTasks);
+
+    fireEvent.click(screen.getAllByLabelText("Move Change filters to another day")[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Tue" }));
+
+    // The wording follows the recurrence kind.
+    expect(await screen.findByRole("button", { name: "Every month" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Every week" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Every month" }));
+    await waitFor(() => expect(setTasks).toHaveBeenCalled());
+
+    const saved = setTasks.mock.calls[0][0].items[0];
+    // The day of month moves; weekdays are never touched for a monthly task.
+    expect(saved.monthDay).toBe(Number(tuesday.slice(-2)));
+    expect(saved.weekdays).toBeUndefined();
+  });
+
+  test("switching a no-deadline task back to One time keeps a usable date", async () => {
+    const setTasks = jest.fn();
+    renderBoard({
+      items: [{ id: 4, title: "Sort the loft", type: "misc", date: "", active: true }],
+      completions: {},
+      moves: {},
+    }, setTasks);
+
+    const misc = document.querySelector(".planner-panel--misc");
+    fireEvent.click(within(misc).getByText("Sort the loft"));
+
+    // Turning the toggle off must seed the date the field already displays.
+    fireEvent.click(await screen.findByRole("button", { name: "No deadline" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save task" }));
+
+    await waitFor(() => expect(setTasks).toHaveBeenCalled());
+    const saved = setTasks.mock.calls[0][0].items[0];
+    expect(saved.type).toBe("once");
+    expect(saved.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test("the day checklist labels each schedule kind", () => {
+    const monday = weekDayKey(0);
+    renderBoard({
+      items: [{ id: 5, title: "Change filters", type: "monthly", monthDay: Number(monday.slice(-2)), active: true }],
+      completions: {},
+      moves: {},
+    }, jest.fn());
+
+    const card = Array.from(document.querySelectorAll(".planner-day-card"))
+      .find(c => c.querySelector(".planner-day-name")?.textContent === "Monday");
+    fireEvent.click(card);
+
+    const checklist = document.querySelector(".planner-checklist");
+    expect(within(checklist).getByText("Monthly")).toBeInTheDocument();
+  });
 });

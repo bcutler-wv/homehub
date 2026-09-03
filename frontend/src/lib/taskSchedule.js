@@ -3,10 +3,31 @@ export const moveKeyFor = completionKey;
 
 export const dateWeekday = (dayKey) => new Date(`${dayKey}T12:00:00`).getDay();
 
+const daysInMonth = (dayKey) => {
+  const d = new Date(`${dayKey}T12:00:00`);
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+};
+
+/**
+ * Which calendar day a monthly task lands on in the month containing `dayKey`.
+ * A task set to the 31st still happens in February — it lands on the last day
+ * rather than silently skipping the month.
+ */
+export const monthlyDayFor = (task, dayKey) => {
+  const wanted = Number(task?.monthDay);
+  if (!Number.isInteger(wanted) || wanted < 1) return null;
+  return Math.min(wanted, daysInMonth(dayKey));
+};
+
 export const isTaskOnDay = (task, dayKey) => {
   if (task.active === false) return false;
   if (task.type === "once") return task.date === dayKey;
   if (task.type === "weekday") return (task.weekdays || []).includes(dateWeekday(dayKey));
+  if (task.type === "monthly") {
+    const target = monthlyDayFor(task, dayKey);
+    return target !== null && new Date(`${dayKey}T12:00:00`).getDate() === target;
+  }
+  // "misc" has no deadline, so it never belongs to a day on the board.
   return false;
 };
 
@@ -90,6 +111,27 @@ export const applyEveryWeekMove = (data, task, fromDayKey, toDayKey) => {
   };
 };
 
+/**
+ * Reschedule a monthly task to a new day of the month. The weekly equivalent
+ * would rewrite `weekdays`, which a monthly task ignores — the task would snap
+ * back to its old day while its completion had already been relocated.
+ */
+export const applyEveryMonthMove = (data, task, fromDayKey, toDayKey) => {
+  const baseDay = resolveBaseDay(data.moves, task.id, fromDayKey);
+  const monthDay = new Date(`${toDayKey}T12:00:00`).getDate();
+  const week = weekStartOf(baseDay);
+  const moves = Object.fromEntries(Object.entries(data.moves || {}).filter(([key]) =>
+    !(key.startsWith(movePrefix(task.id)) && weekStartOf(moveFromDay(key, task.id)) === week)
+  ));
+  const previousTarget = (data.moves || {})[moveKeyFor(task.id, baseDay)] || baseDay;
+  return {
+    ...data,
+    items: data.items.map(t => t.id === task.id ? { ...t, monthDay } : t),
+    moves,
+    completions: relocateCompletion(data.completions, task.id, previousTarget, toDayKey),
+  };
+};
+
 export const applyOnceMove = (data, task, toDayKey) => ({
   ...data,
   items: data.items.map(t => t.id === task.id ? { ...t, date: toDayKey } : t),
@@ -108,8 +150,10 @@ export const applyDayMove = (data, tasks, fromDayKey, toDayKey, scope) => {
   if (!toDayKey || toDayKey === fromDayKey) return data;
   return (tasks || []).reduce((acc, task) => {
     if (task.type === "once") return applyOnceMove(acc, task, toDayKey);
-    if (scope === "always") return applyEveryWeekMove(acc, task, fromDayKey, toDayKey);
-    return applyThisWeekMove(acc, task, fromDayKey, toDayKey);
+    if (scope !== "always") return applyThisWeekMove(acc, task, fromDayKey, toDayKey);
+    // "Permanently" means a different thing per recurrence kind.
+    if (task.type === "monthly") return applyEveryMonthMove(acc, task, fromDayKey, toDayKey);
+    return applyEveryWeekMove(acc, task, fromDayKey, toDayKey);
   }, data);
 };
 

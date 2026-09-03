@@ -41,9 +41,17 @@ const validateTasksData = (body) => {
   }
   for (const item of body.items) {
     if (!item.title || !String(item.title).trim()) throw bad("task title is required");
-    if (!["once", "weekday"].includes(item.type)) throw bad("task type must be once or weekday");
+    if (!["once", "weekday", "monthly", "misc"].includes(item.type)) {
+      throw bad("task type must be once, weekday, monthly or misc");
+    }
     if (item.type === "once" && (!item.date || !ISO_DATE.test(item.date))) {
       throw bad("one-time task date must be in YYYY-MM-DD format");
+    }
+    if (item.type === "monthly") {
+      const day = item.monthDay;
+      if (!Number.isInteger(day) || day < 1 || day > 31) {
+        throw bad("monthly task monthDay must be an integer from 1 to 31");
+      }
     }
     if (item.type === "weekday") {
       if (!Array.isArray(item.weekdays) || item.weekdays.length === 0) {

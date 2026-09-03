@@ -26,6 +26,9 @@ const normalize = (value) => String(value || "").toLowerCase();
 
 const compact = (values) => values.filter(Boolean).map(String);
 
+// Mirrors the task types in lib/taskSchedule.js.
+const TASK_KIND = { weekday: "Recurring", monthly: "Monthly", misc: "No deadline", once: "One time" };
+
 const makeResult = (module, item, title, subtitle, fields) => ({
   id: `${module}-${item?.id || title}`,
   module,
@@ -86,7 +89,7 @@ export function buildSearchIndex(data, enabledFeatures = {}) {
       "tasks",
       task,
       task.title,
-      [task.type === "weekday" ? "Recurring" : "One time", task.date],
+      [TASK_KIND[task.type] || "One time", task.date],
       [task.title, task.notes, task.type, task.date]
     )) : []),
     ...(enabled("maintenance") ? (data.maintenanceTasks || []).map((task) => makeResult(

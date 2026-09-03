@@ -7,7 +7,7 @@ import { apiFetch } from "../lib/api";
 import { dateKey, useTodayKey } from "../lib/utils";
 import {
   normalizeTasks, completionKey, taskAppearsOnDay,
-  applyThisWeekMove, applyEveryWeekMove, applyOnceMove, applyDayMove, pruneStaleMoves,
+  applyThisWeekMove, applyEveryWeekMove, applyEveryMonthMove, applyOnceMove, applyDayMove, pruneStaleMoves,
 } from "../lib/taskSchedule";
 
 const WEEKDAY_OPTIONS = [
@@ -21,6 +21,25 @@ const WEEKDAY_OPTIONS = [
 ];
 
 const DAY_TONES = ["blush", "peach", "sage", "linen", "moss", "cloud", "rose"];
+
+// Completion key slot for tasks that belong to no day.
+const ANYTIME = "anytime";
+
+const taskKindLabel = (task) => {
+  if (task.sourceId) return "Extra";
+  if (task.type === "weekday") return "Recurring";
+  if (task.type === "monthly") return "Monthly";
+  if (task.type === "misc") return "No deadline";
+  return "One time";
+};
+
+const ordinal = (n) => {
+  const num = Number(n);
+  if (!Number.isInteger(num)) return "—";
+  const tens = num % 100;
+  if (tens >= 11 && tens <= 13) return `${num}th`;
+  return `${num}${["th", "st", "nd", "rd"][num % 10] || "th"}`;
+};
 
 const initialsFor = (name) => {
   if (!name) return "?";
@@ -158,6 +177,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
       type: "once",
       date: dayKey,
       weekdays: [1, 2, 3, 4, 5],
+      monthDay: null,
       active: true,
       sourceId: null,
       fromRecurringId: "",
@@ -166,7 +186,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
   };
 
   const saveTask = async () => {
-    const title = taskForm.title.trim();
+    const title = (taskForm.title || "").trim();
     if (!title) return;
     if (taskForm.type === "once" && !taskForm.date) {
       showToast("Choose a date", "danger");
@@ -176,13 +196,19 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
       showToast("Choose at least one weekday", "danger");
       return;
     }
+    const monthDay = Number(taskForm.monthDay);
+    if (taskForm.type === "monthly" && (!Number.isInteger(monthDay) || monthDay < 1 || monthDay > 31)) {
+      showToast("Choose a day of the month", "danger");
+      return;
+    }
     const { fromRecurringId, useTemplate, ...payload } = {
       ...taskForm,
       title,
-      notes: taskForm.notes.trim(),
+      notes: (taskForm.notes || "").trim(),
       assignedUserId: taskForm.assignedUserId || null,
       date: taskForm.type === "once" ? taskForm.date : "",
       weekdays: taskForm.type === "weekday" ? taskForm.weekdays : [],
+      monthDay: taskForm.type === "monthly" ? monthDay : null,
       active: true,
       sourceId: taskForm.sourceId || null,
     };
@@ -223,17 +249,18 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
   };
 
   const activeTasks = data.items.filter(task => task.active !== false);
-  const weekTasks = weekDays.flatMap(day => tasksForDay(day.key).map(task => ({ task, day })));
-  const topPriorities = Array.from(
-    weekTasks
-      .filter(({ task, day }) => !data.completions[completionKey(task.id, day.key)]?.completed)
-      .reduce((map, item) => {
-        if (!map.has(item.task.id)) map.set(item.task.id, item);
-        return map;
-      }, new Map())
-      .values()
-  ).slice(0, 3);
-  const recurringGoals = activeTasks.filter(task => task.type === "weekday").slice(0, 4);
+  // Loose ends with no date, and the monthly recurrences, in the two panels.
+  const miscTasks = activeTasks
+    .filter(task => task.type === "misc")
+    .sort((a, b) => {
+      const ad = !!data.completions[completionKey(a.id, ANYTIME)]?.completed;
+      const bd = !!data.completions[completionKey(b.id, ANYTIME)]?.completed;
+      if (ad !== bd) return ad ? 1 : -1;
+      return String(a.title).localeCompare(String(b.title));
+    });
+  const monthlyTasks = activeTasks
+    .filter(task => task.type === "monthly")
+    .sort((a, b) => (a.monthDay || 0) - (b.monthDay || 0) || String(a.title).localeCompare(String(b.title)));
   const selectedDayTasks = selectedDay ? tasksForDay(selectedDay.key) : [];
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -243,8 +270,9 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
   const moveTask = async (task, fromDayKey, toDayKey, scope) => {
     let next;
     if (task.type === "once") next = applyOnceMove(data, task, toDayKey);
-    else if (scope === "always") next = applyEveryWeekMove(data, task, fromDayKey, toDayKey);
-    else next = applyThisWeekMove(data, task, fromDayKey, toDayKey);
+    else if (scope !== "always") next = applyThisWeekMove(data, task, fromDayKey, toDayKey);
+    else if (task.type === "monthly") next = applyEveryMonthMove(data, task, fromDayKey, toDayKey);
+    else next = applyEveryWeekMove(data, task, fromDayKey, toDayKey);
     await persistTasks(pruneStaleMoves(next), "Task moved");
   };
 
@@ -314,35 +342,53 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
         </header>
 
         <div className="planner-top-grid">
-          <PlannerPanel title="Top priorities" className="planner-panel--priorities">
-            <ol className="planner-priority-list">
-              {[0, 1, 2].map(idx => {
-                const item = topPriorities[idx];
-                if (!item) return <EmptyLine as="li" key={idx} />;
-                const user = userById.get(String(item.task.assignedUserId));
+          <PlannerPanel title="Miscellaneous" className="planner-panel--misc">
+            <div className="planner-loose-list">
+              {miscTasks.length ? miscTasks.map(task => {
+                const done = !!data.completions[completionKey(task.id, ANYTIME)]?.completed;
+                const user = userById.get(String(task.assignedUserId));
                 return (
-                  <li key={`${item.task.id}-${item.day.key}`} className="planner-priority-item">
-                    <button onClick={() => toggleComplete(item.task, item.day.key)} className="planner-line-button">
-                      <span>{item.task.title}</span>
+                  <div key={task.id} className={`planner-loose-row${done ? " is-done" : ""}`}>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="planner-mini-check"
+                      aria-label={done ? `Mark ${task.title} incomplete` : `Mark ${task.title} complete`}
+                      onClick={() => toggleComplete(task, ANYTIME)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleComplete(task, ANYTIME); }
+                      }}
+                    />
+                    <button className="planner-loose-title" onClick={() => setTaskForm({ ...task })}>
+                      {task.title}
                     </button>
-                    <span className="planner-priority-meta">
-                      {item.day.short}
-                      {user && <Assignee user={user} small />}
-                    </span>
-                  </li>
+                    {user && <Assignee user={user} small />}
+                  </div>
                 );
-              })}
-            </ol>
+              }) : (
+                <>
+                  <EmptyLine />
+                  <EmptyLine />
+                  <EmptyLine />
+                </>
+              )}
+            </div>
           </PlannerPanel>
 
-          <PlannerPanel title="Goals of the week" className="planner-panel--goals">
-            <div className="planner-goal-list">
-              {recurringGoals.length ? recurringGoals.map(task => (
-                <button key={task.id} className="planner-goal" onClick={() => setTaskForm({ ...task })}>
-                  <span>{task.title}</span>
-                  <span>{(task.weekdays || []).length}x</span>
-                </button>
-              )) : (
+          <PlannerPanel title="Monthly" className="planner-panel--monthly">
+            <div className="planner-loose-list">
+              {monthlyTasks.length ? monthlyTasks.map(task => {
+                const user = userById.get(String(task.assignedUserId));
+                return (
+                  <div key={task.id} className="planner-loose-row">
+                    <span className="planner-monthday" aria-hidden="true">{ordinal(task.monthDay)}</span>
+                    <button className="planner-loose-title" onClick={() => setTaskForm({ ...task })}>
+                      {task.title}
+                    </button>
+                    {user && <Assignee user={user} small />}
+                  </div>
+                );
+              }) : (
                 <>
                   <EmptyLine />
                   <EmptyLine />
@@ -423,7 +469,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
                     <div className="planner-check-content">
                       <div className="planner-check-title">
                         <span>{task.title}</span>
-                        <span className="planner-chip">{task.sourceId ? "Extra" : task.type === "weekday" ? "Recurring" : "One time"}</span>
+                        <span className="planner-chip">{taskKindLabel(task)}</span>
                         {user && <Assignee user={user} />}
                       </div>
                       {task.notes && <p>{task.notes}</p>}
@@ -489,22 +535,75 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
               </div>
               <div>
                 <label>Schedule</label>
-                <div className="planner-segmented">
-                  {["once", "weekday"].map(type => (
+                <div className="planner-segmented planner-segmented--three">
+                  {[
+                    { id: "once", label: "One time" },
+                    { id: "weekday", label: "Weekly" },
+                    { id: "monthly", label: "Monthly" },
+                  ].map(option => (
                     <button
-                      key={type}
-                      onClick={() => setTaskForm(p => ({ ...p, type }))}
-                      className={taskForm.type === type ? "is-active" : ""}
+                      key={option.id}
+                      onClick={() => setTaskForm(p => ({
+                        ...p,
+                        type: option.id,
+                        // Seed whatever the newly chosen schedule needs, so the
+                        // value the field displays is the value that gets saved.
+                        date: option.id === "once" ? (p.date || todayKey) : p.date,
+                        monthDay: option.id === "monthly"
+                          ? (p.monthDay || parseDay(p.date || todayKey).getDate())
+                          : p.monthDay,
+                      }))}
+                      className={taskForm.type === option.id || (taskForm.type === "misc" && option.id === "once") ? "is-active" : ""}
                     >
-                      {type === "once" ? "One time" : "Weekdays"}
+                      {option.label}
                     </button>
                   ))}
                 </div>
               </div>
-              {taskForm.type === "once" ? (
+              {taskForm.type === "once" || taskForm.type === "misc" ? (
                 <div>
                   <label>Date</label>
-                  <input type="date" value={taskForm.date || todayKey} onChange={e => setTaskForm(p => ({ ...p, date: e.target.value }))} />
+                  <div className="planner-date-row">
+                    <input
+                      type="date"
+                      value={taskForm.date || todayKey}
+                      disabled={taskForm.type === "misc"}
+                      onChange={e => setTaskForm(p => ({ ...p, date: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      aria-pressed={taskForm.type === "misc"}
+                      className={`planner-nodeadline${taskForm.type === "misc" ? " is-active" : ""}`}
+                      onClick={() => setTaskForm(p => ({
+                        ...p,
+                        type: p.type === "misc" ? "once" : "misc",
+                        date: p.type === "misc" ? (p.date || todayKey) : p.date,
+                      }))}
+                    >
+                      No deadline
+                    </button>
+                  </div>
+                  {taskForm.type === "misc" && (
+                    <p className="planner-field-hint">Lands in Miscellaneous rather than on a day.</p>
+                  )}
+                </div>
+              ) : taskForm.type === "monthly" ? (
+                <div>
+                  <label>Day of the month</label>
+                  <select
+                    aria-label="Day of the month"
+                    value={taskForm.monthDay || 1}
+                    onChange={e => setTaskForm(p => ({ ...p, monthDay: Number(e.target.value) }))}
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{ordinal(d)}</option>
+                    ))}
+                  </select>
+                  {taskForm.monthDay > 28 && (
+                    <p className="planner-field-hint">
+                      Shorter months use their last day, so this never skips a month.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -571,7 +670,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
                   setMovePrompt(null);
                 }}
               >
-                Just this week
+                {movePrompt.task?.type === "monthly" ? "Just this time" : "Just this week"}
               </button>
               <button
                 className="planner-primary-btn"
@@ -581,7 +680,7 @@ export default function TodoTasks({ tasks, setTasks, users = [], currentUser, ap
                   setMovePrompt(null);
                 }}
               >
-                Every week
+                {movePrompt.task?.type === "monthly" ? "Every month" : "Every week"}
               </button>
             </div>
           </div>
