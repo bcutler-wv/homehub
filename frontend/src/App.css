@@ -1571,7 +1571,9 @@ li.planner-empty-line {
     gap: 0;
   }
 
-  .sidebar-user > :not(.sidebar-user-row) { display: none; }
+  /* The sync pill and sign-out carry inline styles, so hiding them from the
+     stylesheet needs !important — otherwise they keep stretching the bar. */
+  .sidebar-user > :not(.sidebar-user-row) { display: none !important; }
   .sidebar-user-row > p { display: none; }
   .sidebar-user-row { gap: 0; width: auto; }
 
