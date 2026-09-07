@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { fmt, displayStatus } from "../lib/utils";
+import { fmt, displayStatus, dateKey } from "../lib/utils";
 import Corkboard from "./Corkboard";
 
 // ─── Weather ──────────────────────────────────────────────────────────────────
@@ -326,7 +326,9 @@ function UpNextCard({ events, onNavigate }) {
     const now = new Date();
     return events
       .map(e => ({ ...e, startDate: new Date(e.start) }))
-      .filter(e => e.startDate >= now)
+      // An all-day event counts for the whole of its day, so compare on the
+      // calendar day rather than dropping it at one minute past midnight.
+      .filter(e => (e.allDay ? dateKey(e.startDate) >= dateKey(now) : e.startDate >= now))
       .sort((a, b) => a.startDate - b.startDate)
       .slice(0, 4);
   }, [events]);
@@ -356,7 +358,11 @@ function UpNextCard({ events, onNavigate }) {
             const d = ev.startDate;
             const weekday = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
             const date = d.getDate();
-            const timeStr = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+            // An all-day event has no meaningful clock time; showing 00:00 reads
+            // as midnight rather than "all day".
+            const timeStr = ev.allDay
+              ? "All day"
+              : d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
             const dotColor = DOT_COLORS[i % DOT_COLORS.length];
 
             return (

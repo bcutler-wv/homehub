@@ -393,16 +393,67 @@ const generateInvoiceNo = (invoices) => {
 
 const unfoldICS = (content) => content.replace(/\r?\n[ \t]/g, "");
 
-const parseICSTime = (value) => {
+/**
+ * Wall-clock time in a named zone to the actual instant, without a dependency.
+ * Formats a guess back into the zone and corrects by however far it landed off.
+ * Ambiguous times in a DST fall-back hour resolve to one of the two, which is
+ * the same compromise every lightweight implementation makes.
+ */
+const zonedTimeToUtc = (y, mo, d, h, mi, sec, timeZone) => {
+  const guess = Date.UTC(y, mo - 1, d, h, mi, sec);
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone, hour12: false,
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      }).formatToParts(new Date(guess)).map(p => [p.type, p.value])
+    );
+    const asZone = Date.UTC(
+      Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+      Number(parts.hour) % 24, Number(parts.minute), Number(parts.second)
+    );
+    return new Date(guess - (asZone - guess));
+  } catch {
+    return new Date(guess); // unknown TZID — treat the wall clock as UTC
+  }
+};
+
+/**
+ * An ICS date-time, returned with the flag the rest of the app needs.
+ *
+ * All-day values (VALUE=DATE) are calendar days, not instants. Turning one into
+ * midnight UTC puts it on the previous day for anyone west of Greenwich, so it
+ * is kept as a floating local time — the browser then reads it as midnight
+ * where the viewer is, which is what an all-day event means.
+ *
+ * A TZID names the zone the wall-clock time belongs to. It used to be dropped,
+ * so 9am New York was stored as 9am UTC and displayed four hours early.
+ */
+const parseICSTime = (value, params = {}) => {
   if (!value) return null;
-  const normalized = value.replace(/Z$/, "");
-  if (/^\d{8}$/.test(normalized)) {
-    return new Date(`${normalized.slice(0, 4)}-${normalized.slice(4, 6)}-${normalized.slice(6, 8)}T00:00:00`);
+  const raw = String(value).trim();
+
+  if (params.VALUE === "DATE" || /^\d{8}$/.test(raw)) {
+    const day = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+    return { value: `${day}T00:00:00`, allDay: true };
   }
-  if (/^\d{8}T\d{6}$/.test(normalized)) {
-    return new Date(`${normalized.slice(0, 4)}-${normalized.slice(4, 6)}-${normalized.slice(6, 8)}T${normalized.slice(9, 11)}:${normalized.slice(11, 13)}:${normalized.slice(13, 15)}`);
+
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/.exec(raw);
+  if (match) {
+    const [, y, mo, d, h, mi, sec, zulu] = match;
+    if (zulu) {
+      return { value: new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +sec)).toISOString(), allDay: false };
+    }
+    if (params.TZID) {
+      return { value: zonedTimeToUtc(+y, +mo, +d, +h, +mi, +sec, params.TZID).toISOString(), allDay: false };
+    }
+    // Floating: RFC 5545 says this is the viewer's local time, so leave it so.
+    return { value: `${y}-${mo}-${d}T${h}:${mi}:${sec}`, allDay: false };
   }
-  return new Date(normalized);
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : { value: parsed.toISOString(), allDay: false };
 };
 
 const parseICS = (content, provider) => {
@@ -414,13 +465,16 @@ const parseICS = (content, provider) => {
     if (line === "BEGIN:VEVENT") { current = {}; continue; }
     if (line === "END:VEVENT") {
       if (current?.dtstart) {
+        const start = parseICSTime(current.dtstart.value, current.dtstart.params);
+        const end = current.dtend ? parseICSTime(current.dtend.value, current.dtend.params) : null;
         events.push({
-          uid: current.uid || `${provider}-${Date.now()}-${Math.random()}`,
-          title: current.summary || "Untitled event",
-          description: current.description || "",
-          location: current.location || "",
-          start: parseICSTime(current.dtstart) || new Date().toISOString(),
-          end: parseICSTime(current.dtend) || parseICSTime(current.dtstart) || new Date().toISOString(),
+          uid: current.uid?.value || `${provider}-${Date.now()}-${Math.random()}`,
+          title: current.summary?.value || "Untitled event",
+          description: current.description?.value || "",
+          location: current.location?.value || "",
+          start: start?.value || new Date().toISOString(),
+          end: (end || start)?.value || new Date().toISOString(),
+          allDay: Boolean(start?.allDay),
           provider,
         });
       }
@@ -430,8 +484,14 @@ const parseICS = (content, provider) => {
     if (!current) continue;
     const colonIdx = line.indexOf(":");
     if (colonIdx === -1) continue;
-    const key = line.slice(0, colonIdx).split(";")[0].toLowerCase();
-    current[key] = line.slice(colonIdx + 1);
+    // Parameters carry VALUE=DATE and TZID, so the name alone is not enough.
+    const [name, ...paramParts] = line.slice(0, colonIdx).split(";");
+    const params = {};
+    for (const part of paramParts) {
+      const eq = part.indexOf("=");
+      if (eq > 0) params[part.slice(0, eq).toUpperCase()] = part.slice(eq + 1).replace(/^"|"$/g, "");
+    }
+    current[name.toLowerCase()] = { value: line.slice(colonIdx + 1), params };
   }
 
   return events;

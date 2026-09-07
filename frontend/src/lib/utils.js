@@ -6,7 +6,25 @@ export const fmt = (n) =>
 export const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "-";
 
-export const dateKey = (date) => new Date(date).toISOString().slice(0, 10);
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The calendar day something belongs to, in the viewer's timezone.
+ *
+ * This used to slice toISOString(), which is UTC: west of Greenwich every
+ * evening rolled over early, so after 8pm New York time "today" was tomorrow —
+ * the wrong day column was highlighted and completions were keyed a day ahead.
+ * A bare YYYY-MM-DD is already a calendar day and is passed through, since
+ * parsing it would reinterpret it as UTC midnight and shift it back again.
+ */
+export const dateKey = (date) => {
+  if (typeof date === "string" && DATE_ONLY.test(date)) return date;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+};
 
 export const getWeekDays = () => {
   const today = new Date();

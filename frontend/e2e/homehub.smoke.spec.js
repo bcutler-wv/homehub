@@ -52,12 +52,21 @@ const columnFor = (page, dayName) =>
 // dnd-kit activates on pointer movement past a distance threshold, so a single
 // jump from source to target is not enough — it needs intermediate positions.
 const dragOnto = async (page, source, target) => {
+  await source.scrollIntoViewIfNeeded();
   const from = await source.boundingBox();
   const to = await target.boundingBox();
+  const viewport = page.viewportSize();
+
+  // Aim near the top of the target rather than its centre: a tall day column
+  // can have its middle below the fold, and the pointer cannot be moved off
+  // screen, so the drop would never register.
+  const targetX = to.x + to.width / 2;
+  const targetY = Math.min(to.y + Math.min(60, to.height / 2), viewport.height - 8);
+
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(from.x + from.width / 2 + 24, from.y + from.height / 2, { steps: 6 });
-  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  await page.mouse.move(targetX, targetY, { steps: 12 });
   await page.mouse.up();
 };
 

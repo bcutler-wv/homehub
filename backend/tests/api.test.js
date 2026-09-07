@@ -356,6 +356,51 @@ test("backup export includes JSON data files and uploaded file entries", async (
   assert.ok(invoices.some((invoice) => invoice.vendor === "Backup Vendor"));
 });
 
+test("ICS times keep the day and hour the calendar meant", () => {
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "BEGIN:VEVENT", "UID:a", "SUMMARY:All day", "DTSTART;VALUE=DATE:20260907", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:b", "SUMMARY:Zoned", "DTSTART;TZID=America/New_York:20260907T090000", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:c", "SUMMARY:Utc", "DTSTART:20260907T130000Z", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:d", "SUMMARY:Winter zoned", "DTSTART;TZID=America/New_York:20260115T090000", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:e", "SUMMARY:Floating", "DTSTART:20260907T090000", "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  const byTitle = Object.fromEntries(parseICS(ics, "google").map(e => [e.title, e]));
+
+  // An all-day event is a calendar day. Storing midnight UTC put it on the
+  // previous day for anyone west of Greenwich.
+  assert.equal(byTitle["All day"].allDay, true);
+  assert.equal(byTitle["All day"].start, "2026-09-07T00:00:00");
+  assert.ok(!byTitle["All day"].start.endsWith("Z"), "all-day must stay floating, not become an instant");
+
+  // TZID used to be discarded, so 9am New York was stored as 9am UTC.
+  assert.equal(byTitle["Zoned"].start, "2026-09-07T13:00:00.000Z");
+  assert.equal(byTitle["Zoned"].allDay, false);
+
+  // Standard time is a five hour offset, so the same wall clock is a different
+  // instant in January — this is why a fixed offset would not do.
+  assert.equal(byTitle["Winter zoned"].start, "2026-01-15T14:00:00.000Z");
+
+  // A Z-suffixed time was already correct and must stay so.
+  assert.equal(byTitle["Utc"].start, "2026-09-07T13:00:00.000Z");
+
+  // A floating time means "wherever the viewer is", so it stays floating.
+  assert.equal(byTitle["Floating"].start, "2026-09-07T09:00:00");
+});
+
+test("an unknown TZID falls back rather than throwing", () => {
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "BEGIN:VEVENT", "UID:x", "SUMMARY:Odd zone", "DTSTART;TZID=Mars/Olympus:20260907T090000", "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const [event] = parseICS(ics, "google");
+  assert.equal(event.title, "Odd zone");
+  assert.ok(event.start);
+});
+
 test("calendar import parses ICS and calendar save deduplicates repeated events", async () => {
   removeDataFiles("calendar.json", "activity.json");
   const agent = await loginAs();
